@@ -1,129 +1,35 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NotesFrais — Mike</title>
-<script src="https://cdn.jsdelivr.net/npm/react@17.0.2/umd/react.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/react-dom@17.0.2/umd/react-dom.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.10/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>NotesFrais</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{font-family:'DM Sans',sans-serif;background:#F5F3EF;color:#1A1A1A;min-height:100vh}
-:root{--bg:#F5F3EF;--w:#fff;--s2:#EDEBE6;--text:#1A1A1A;--t2:#6B6560;--t3:#9E9892;--accent:#2D5BE3;--al:#EEF2FD;--green:#0F6E56;--gl:#E1F5EE;--amber:#BA7517;--aml:#FAEEDA;--red:#A32D2D;--rl:#FCEBEB;--border:#E2DED8;}
-::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-input,select,textarea,button{font-family:'DM Sans',sans-serif}
+html,body{height:100%;margin:0}
+body{font-family:system-ui,sans-serif;background:#F5F3EF;color:#1A1A1A;display:flex;align-items:center;justify-content:center}
+#status{font-size:14px;color:#6B6560}
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="status">Chargement de NotesFrais…</div>
 <script>
-window.onerror=function(msg,src,line,col,err){
-  document.getElementById("root").innerHTML="<div style=\"padding:20px;font-family:monospace;color:red\"><b>Erreur:</b> "+msg+"<br>"+src+":"+line+"</div>";
-  return false;
-};
+(async function () {
+  const sourceUrl = 'https://raw.githubusercontent.com/NumeriqAG/notesfrais/cf852cc876acf78c8926325c60aa54f87ee25039/index.html';
+  const broken = "        </div>}\n      </div>\n\n        {tab==='stats'&&<StatsTab expenses={expenses} month={month} months={MONTHS}/>}\n      </div>\n\n      {showUBS&&<UBSModal onClose={()=>setShowUBS(false)} onImport={handleUBS}/>}\n      {showAdd&&<AddModal onClose={()=>setShowAdd(false)} onAdd={addExpense} month={month}/>}\n    </div>";
+  const fixed = "        </div>}\n\n        {tab==='stats'&&<StatsTab expenses={expenses} month={month} months={MONTHS}/>}\n      </div>\n\n      {showUBS&&<UBSModal onClose={()=>setShowUBS(false)} onImport={handleUBS}/>}\n      {showAdd&&<AddModal onClose={()=>setShowAdd(false)} onAdd={addExpense} month={month}/>}\n    </div>";
+  try {
+    const res = await fetch(sourceUrl, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    let html = await res.text();
+    if (!html.includes(broken)) throw new Error('Patch target not found');
+    html = html.replace(broken, fixed);
+    document.open();
+    document.write(html);
+    document.close();
+  } catch (err) {
+    document.getElementById('status').textContent = 'Erreur de chargement: ' + err.message;
+  }
+})();
 </script>
-<script type="text/babel" data-presets="react,env">
-const {useState,useRef,useCallback,useMemo,useEffect}=React;
-
-const SUPABASE_URL='https://zxbhfcihivgihytmxczl.supabase.co';
-const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4YmhmY2loaXZnaWh5dG14Y3psIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2Njc5MzUsImV4cCI6MjA4OTI0MzkzNX0.UrKPkehlpf9b4VWV7j6rOF_KO98KqBm45zaNtIHZZ1w';
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-
-/* ── SUPABASE ── */
-function lastDayOfMonth(month){
-  // month = 'YYYY-MM', returns last day as 'YYYY-MM-DD'
-  const [y,m]=month.split('-').map(Number);
-  return new Date(y,m,0).toISOString().split('T')[0]; // day 0 of next month = last day of this month
-}
-
-async function fetchExpenses(month){
-  const{data,error}=await sb.from('expenses').select('*').gte('date',`${month}-01`).lte('date',lastDayOfMonth(month)).order('date',{ascending:false});
-  if(error)throw error;
-  return data.map(nr);
-}
-async function insertExpense(e){
-  const{data,error}=await sb.from('expenses').insert([tr(e)]).select().single();
-  if(error)throw error;
-  return nr(data);
-}
-async function updateStatus(id,status,ul='',ud=null,ad=0){
-  const{error}=await sb.from('expenses').update({status,ubs_label:ul,ubs_date:ud,amt_diff:ad}).eq('id',id);
-  if(error)throw error;
-}
-async function deleteById(id,receiptUrl){
-  if(receiptUrl){
-    const path=receiptUrl.split('/receipts/')[1];
-    if(path)await sb.storage.from('receipts').remove([decodeURIComponent(path)]);
-  }
-  const{error}=await sb.from('expenses').delete().eq('id',id);
-  if(error)throw error;
-}
-async function uploadReceipt(file){
-  const ext=file.name.split('.').pop();
-  const name=`${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-  const{error}=await sb.storage.from('receipts').upload(name,file,{contentType:file.type});
-  if(error)throw error;
-  const{data:{publicUrl}}=sb.storage.from('receipts').getPublicUrl(name);
-  return{url:publicUrl,name:file.name};
-}
-function tr(e){return{date:e.date,merchant:e.merchant,amount:e.amount,amount_chf:e.amountCHF||e.amount,tva:e.tva||0,category:e.category||'autre',currency:e.currency||'CHF',status:e.status||'pending',note:e.note||'',ubs_label:e.ubsRow?.label||'',ubs_date:e.ubsRow?.date||null,amt_diff:e.amtDiff||0,receipt_url:e.receiptUrl||null,receipt_name:e.receiptName||null};}
-function nr(r){return{id:r.id,date:r.date,merchant:r.merchant,amount:parseFloat(r.amount),amountCHF:parseFloat(r.amount_chf),tva:parseFloat(r.tva||0),category:r.category,currency:r.currency,status:r.status,note:r.note||'',ubsRow:r.ubs_label?{label:r.ubs_label,date:r.ubs_date}:null,amtDiff:parseFloat(r.amt_diff||0),receiptUrl:r.receipt_url||null,receiptName:r.receipt_name||null};}
-
-/* ── UBS PARSER ── */
-function parseUBS(raw){
-  const lines=raw.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
-  let hi=0;
-  for(let i=0;i<Math.min(10,lines.length);i++){const l=lines[i].toLowerCase();if(l.includes('datum')||l.includes('buchungstext')||l.includes('libellé')||l.includes('amount')||l.includes('montant')){hi=i;break;}}
-  const hh=spl(lines[hi]).map(h=>h.toLowerCase().trim());
-  const col={date:fc(hh,['datum','date']),label:fc(hh,['buchungstext','libellé','description','text']),amount:fc(hh,['betrag','montant','amount']),currency:fc(hh,['währung','devise','currency'])};
-  const rows=[];
-  for(let i=hi+1;i<lines.length;i++){
-    const c=spl(lines[i]);if(c.length<3)continue;
-    const date=pd(c[col.date]??'');const amount=pn(c[col.amount]??'');
-    if(!date||isNaN(amount))continue;
-    rows.push({date,label:(c[col.label]??'').trim(),amount,currency:(c[col.currency]??'CHF').trim()||'CHF'});
-  }
-  let info='';if(hi>0)info=lines.slice(0,hi).map(l=>spl(l).join(' ').trim()).filter(l=>l.length>2).join(' · ');
-  return{rows,info};
-}
-function fc(h,c){for(const x of c){const i=h.findIndex(k=>k.includes(x));if(i>=0)return i;}return -1;}
-function spl(line){const r=[];let cur='',q=false;for(const ch of line){if(ch==='"'){q=!q;continue;}if(ch===';'&&!q){r.push(cur);cur='';continue;}cur+=ch;}r.push(cur);return r;}
-function pd(s){s=s.trim();const m=s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;return null;}
-function pn(s){s=s.trim().replace(/'/g,'').replace(/\s/g,'');if(!s||s==='-')return NaN;return parseFloat(s);}
-
-/* ── RECONCILIATION ── */
-function reconcile(expenses,ubsRows){
-  const matched=new Set();
-  const updated=expenses.map(exp=>{
-    if(exp.status==='reconciled')return exp;
-    const ea=Math.abs(exp.amountCHF||exp.amount),ed=new Date(exp.date);
-    for(let i=0;i<ubsRows.length;i++){
-      if(matched.has(i))continue;
-      const r=ubsRows[i];if(r.amount>=0)continue;
-      const ra=Math.abs(r.amount),dd=Math.abs((ed-new Date(r.date))/86400000),ap=ra>0?Math.abs(ea-ra)/ra:1;
-      if(dd<=2&&ap<=0.05){matched.add(i);return{...exp,status:'reconciled',ubsRow:r,amtDiff:Math.abs(ea-ra)>0.005?ra-ea:0};}
-    }
-    return exp;
-  });
-  return{expenses:updated,forgotten:ubsRows.filter((r,i)=>!matched.has(i)&&r.amount<0)};
-}
-
-const UBS_DEMO=`UBS Switzerland AG\nCompte: CH56 0483 5012 3456 7800 9\n"Datum";"Buchungstext";"Betrag";"Saldo";"Währung"\n"01.03.2026";"Gutschrift Gehalt";"8'500.00";"12'840.20";"CHF"\n"02.03.2026";"Coop Supermarché";"-43.60";"12'796.60";"CHF"\n"03.03.2026";"Netflix";"-17.90";"12'778.70";"CHF"\n"05.03.2026";"Uber *Trip";"-18.50";"12'760.20";"CHF"\n"07.03.2026";"Brasserie de la Paix";"-67.20";"12'693.00";"CHF"\n"11.03.2026";"Ibis Budget Lausanne";"-89.00";"12'508.60";"CHF"\n"12.03.2026";"SBB CFF Billetterie";"-48.00";"12'460.60";"CHF"\n"13.03.2026";"SBB CFF Billetterie";"-32.00";"12'428.60";"CHF"\n"14.03.2026";"Restaurant Le Bistrot SA";"-45.80";"12'382.80";"CHF"`;
-
-/* ── CONSTANTS ── */
-const CATS=[{id:'repas',label:'Repas',icon:'🍽',color:'#E8F5E9'},{id:'transport',label:'Transport',icon:'🚆',color:'#E3F2FD'},{id:'hotel',label:'Hôtel',icon:'🏨',color:'#FFF3E0'},{id:'materiel',label:'Matériel',icon:'💻',color:'#F3E5F5'},{id:'autre',label:'Autre',icon:'📎',color:'#ECEFF1'}];
-const CMAP=Object.fromEntries(CATS.map(c=>[c.id,c]));
-const MONTHS=[{v:'2026-01',l:'Janvier 2026'},{v:'2026-02',l:'Février 2026'},{v:'2026-03',l:'Mars 2026'},{v:'2026-04',l:'Avril 2026'},{v:'2026-05',l:'Mai 2026'},{v:'2026-06',l:'Juin 2026'}];
-const fmt=n=>Number(n||0).toFixed(2);
-const fd=d=>new Date(d+'T00:00:00').toLocaleDateString('fr-CH',{day:'2-digit',month:'short'});
-const tot=arr=>arr.reduce((s,e)=>s+Math.abs(Number(e.amountCHF||e.amount||0)),0);
-const isPDF=u=>u&&u.toLowerCase().includes('.pdf');
-
-const bP={display:'inline-flex',alignItems:'center',gap:7,padding:'10px 16px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:500,cursor:'pointer'};
-const bS={display:'inline-flex',alignItems:'center',gap:6,padding:'9px 13px',background:'var(--s2)',color:'var(--text)',border:'0.5px solid var(--border)',borderRadius:10,fontSize:13,cursor:'pointer'};
-const inp={width:'100%',padding:'9px 12px',border:'0.5px solid var(--border)',borderRadius:9,fontSize:13,background:'var(--s2)',color:'var(--text)',outline:'none'};
-const lbl={display:'block',fontSize:11,color:'var(--t3)',marginBottom:5};
+</body>
+</html>
