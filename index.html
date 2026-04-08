@@ -128,11 +128,39 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
     </div>
   );
 }`;
+  const periodBlockOld=String.raw`<div style={{padding:isMobile?'0 12px 10px':'0 12px 12px'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.08em',padding:'0 8px',marginBottom:6}}>PÉRIODE</div><div style={{display:'flex',flexDirection:isMobile?'row':'column',gap:isMobile?8:0,overflowX:isMobile?'auto':'visible',paddingBottom:isMobile?4:0,WebkitOverflowScrolling:'touch'}}>{MONTHS.map(m=><button key={m.v} onClick={()=>setMonth(m.v)} style={{width:isMobile?'auto':'100%',minWidth:isMobile?132:'auto',textAlign:'left',padding:'7px 12px',borderRadius:8,border:'none',background:month===m.v?'var(--al)':'none',color:month===m.v?'var(--accent)':'var(--t2)',fontSize:13,fontWeight:month===m.v?500:400,cursor:'pointer',marginBottom:isMobile?0:2,display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexShrink:0}}><span>{m.l}</span>{monthCounts[m.v]>0&&<span style={{minWidth:20,height:20,padding:'0 6px',borderRadius:999,background:month===m.v?'rgba(26,63,181,0.12)':'var(--s2)',color:month===m.v?'var(--accent)':'var(--t3)',fontSize:11,fontWeight:600,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{monthCounts[m.v]}</span>}</button>)}</div></div>`;
+  const periodBlockNew=String.raw`<div style={{padding:isMobile?'0 12px 10px':'0 12px 12px'}}>
+          <div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.08em',padding:'0 8px',marginBottom:6}}>PÉRIODE</div>
+          {isMobile
+            ?<div style={{padding:'0 4px'}}>
+              <select
+                value={month}
+                onChange={e=>setMonth(e.target.value)}
+                style={{...inp,fontSize:16,padding:'12px 14px',background:'#fff'}}
+              >
+                {MONTHS.map(m=>(
+                  <option key={m.v} value={m.v}>
+                    {monthCounts[m.v]>0?m.l+' ('+monthCounts[m.v]+')':m.l}
+                  </option>
+                ))}
+              </select>
+            </div>
+            :<div style={{display:'flex',flexDirection:'column',gap:0}}>
+              {MONTHS.map(m=>(
+                <button key={m.v} onClick={()=>setMonth(m.v)} style={{width:'100%',textAlign:'left',padding:'7px 12px',borderRadius:8,border:'none',background:month===m.v?'var(--al)':'none',color:month===m.v?'var(--accent)':'var(--t2)',fontSize:13,fontWeight:month===m.v?500:400,cursor:'pointer',marginBottom:2,display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+                  <span>{m.l}</span>
+                  {monthCounts[m.v]>0&&<span style={{minWidth:20,height:20,padding:'0 6px',borderRadius:999,background:month===m.v?'rgba(26,63,181,0.12)':'var(--s2)',color:month===m.v?'var(--accent)':'var(--t3)',fontSize:11,fontWeight:600,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{monthCounts[m.v]}</span>}
+                </button>
+              ))}
+            </div>
+          }
+        </div>`;
   try{
     const res=await fetch(sourceUrl,{cache:'no-store'});
     if(!res.ok) throw new Error('HTTP '+res.status);
     let html=await res.text();
     html=html.replace(statsPlaceholder,statsReplacement);
+    html=html.replace(periodBlockOld,periodBlockNew);
     html=html.replace("function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;","function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;\n  const formInputStyle=isMobile?{...inp,fontSize:16,padding:'12px 14px'}:inp;");
     html=html.replace(/style=\{inp\}/g,"style={typeof formInputStyle!=='undefined'?formInputStyle:inp}");
     html=html.replace('autoFocus/>','autoFocus={!isMobile}/>');
