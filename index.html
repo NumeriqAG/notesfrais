@@ -3,470 +3,147 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NotesFrais â€” Mike</title>
-<script src="https://cdn.jsdelivr.net/npm/react@17.0.2/umd/react.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/react-dom@17.0.2/umd/react-dom.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.10/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>NotesFrais</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-html,body,#root{height:100%}
-body{font-family:'DM Sans',sans-serif;background:#F5F3EF;color:#1A1A1A;min-height:100vh;min-height:100dvh}
-:root{--bg:#F5F3EF;--w:#fff;--s2:#EDEBE6;--text:#1A1A1A;--t2:#6B6560;--t3:#9E9892;--accent:#2D5BE3;--al:#EEF2FD;--green:#0F6E56;--gl:#E1F5EE;--amber:#BA7517;--aml:#FAEEDA;--red:#A32D2D;--rl:#FCEBEB;--border:#E2DED8;}
-::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-input,select,textarea,button{font-family:'DM Sans',sans-serif}
+html,body{height:100%;margin:0}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5F3EF;color:#1A1A1A;display:flex;align-items:center;justify-content:center}
+.loader{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:24px}
+.dot{width:42px;height:42px;border-radius:50%;background:#2D5BE3;opacity:.14;animation:pulse 1.2s ease-in-out infinite}
+.msg{font-size:14px;color:#6B6560}
+@keyframes pulse{0%,100%{transform:scale(.92);opacity:.12}50%{transform:scale(1);opacity:.24}}
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div class="loader">
+  <div class="dot"></div>
+  <div class="msg">Chargement de NotesFrais…</div>
+</div>
 <script>
-window.onerror=function(msg,src,line,col,err){
-  document.getElementById("root").innerHTML="<div style=\"padding:20px;font-family:monospace;color:red\"><b>Erreur:</b> "+msg+"<br>"+src+":"+line+"</div>";
-  return false;
-};
-</script>
-<script type="text/babel" data-presets="react,env">
-const {useState,useRef,useCallback,useMemo,useEffect}=React;
-
-const SUPABASE_URL='https://zxbhfcihivgihytmxczl.supabase.co';
-const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4YmhmY2loaXZnaWh5dG14Y3psIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2Njc5MzUsImV4cCI6MjA4OTI0MzkzNX0.UrKPkehlpf9b4VWV7j6rOF_KO98KqBm45zaNtIHZZ1w';
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-
-/* SUPABASE */
-function lastDayOfMonth(month){
-  const [y,m]=month.split('-').map(Number);
-  return new Date(y,m,0).toISOString().split('T')[0];
-}
-async function fetchExpenses(month){
-  const{data,error}=await sb.from('expenses').select('*').gte('date',`${month}-01`).lte('date',lastDayOfMonth(month)).order('date',{ascending:false});
-  if(error)throw error;
-  return data.map(nr);
-}
-async function insertExpense(e){
-  const{data,error}=await sb.from('expenses').insert([tr(e)]).select().single();
-  if(error)throw error;
-  return nr(data);
-}
-async function updateStatus(id,status,ul='',ud=null,ad=0){
-  const{error}=await sb.from('expenses').update({status,ubs_label:ul,ubs_date:ud,amt_diff:ad}).eq('id',id);
-  if(error)throw error;
-}
-async function deleteById(id,receiptUrl){
-  if(receiptUrl){
-    const path=receiptUrl.split('/receipts/')[1];
-    if(path)await sb.storage.from('receipts').remove([decodeURIComponent(path)]);
-  }
-  const{error}=await sb.from('expenses').delete().eq('id',id);
-  if(error)throw error;
-}
-async function uploadReceipt(file){
-  const ext=file.name.split('.').pop();
-  const name=`${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-  const{error}=await sb.storage.from('receipts').upload(name,file,{contentType:file.type});
-  if(error)throw error;
-  const{data:{publicUrl}}=sb.storage.from('receipts').getPublicUrl(name);
-  return{url:publicUrl,name:file.name};
-}
-function tr(e){return{date:e.date,merchant:e.merchant,amount:e.amount,amount_chf:e.amountCHF||e.amount,tva:e.tva||0,category:e.category||'autre',currency:e.currency||'CHF',status:e.status||'pending',note:e.note||'',ubs_label:e.ubsRow?.label||'',ubs_date:e.ubsRow?.date||null,amt_diff:e.amtDiff||0,receipt_url:e.receiptUrl||null,receipt_name:e.receiptName||null};}
-function nr(r){return{id:r.id,date:r.date,merchant:r.merchant,amount:parseFloat(r.amount),amountCHF:parseFloat(r.amount_chf),tva:parseFloat(r.tva||0),category:r.category,currency:r.currency,status:r.status,note:r.note||'',ubsRow:r.ubs_label?{label:r.ubs_label,date:r.ubs_date}:null,amtDiff:parseFloat(r.amt_diff||0),receiptUrl:r.receipt_url||null,receiptName:r.receipt_name||null};}
-
-/* UBS PARSER */
-function parseUBS(raw){
-  const lines=raw.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
-  let hi=0;
-  for(let i=0;i<Math.min(10,lines.length);i++){
-    const l=lines[i].toLowerCase();
-    if(l.includes('datum')||l.includes('buchungstext')||l.includes('libellé')||l.includes('amount')||l.includes('montant')){hi=i;break;}
-  }
-  const hh=spl(lines[hi]).map(h=>h.toLowerCase().trim());
-  const col={date:fc(hh,['datum','date']),label:fc(hh,['buchungstext','libellé','description','text']),amount:fc(hh,['betrag','montant','amount']),currency:fc(hh,['währung','devise','currency'])};
-  const rows=[];
-  for(let i=hi+1;i<lines.length;i++){
-    const c=spl(lines[i]);if(c.length<3)continue;
-    const date=pd(c[col.date]??'');const amount=pn(c[col.amount]??'');
-    if(!date||isNaN(amount))continue;
-    rows.push({date,label:(c[col.label]??'').trim(),amount,currency:(c[col.currency]??'CHF').trim()||'CHF'});
-  }
-  let info='';
-  if(hi>0)info=lines.slice(0,hi).map(l=>spl(l).join(' ').trim()).filter(l=>l.length>2).join(' · ');
-  return{rows,info};
-}
-function fc(h,c){for(const x of c){const i=h.findIndex(k=>k.includes(x));if(i>=0)return i;}return -1;}
-function spl(line){const r=[];let cur='',q=false;for(const ch of line){if(ch==='"'){q=!q;continue;}if(ch===';'&&!q){r.push(cur);cur='';continue;}cur+=ch;}r.push(cur);return r;}
-function pd(s){s=s.trim();const m=s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;return null;}
-function pn(s){s=s.trim().replace(/'/g,'').replace(/\s/g,'');if(!s||s==='-')return NaN;return parseFloat(s);}
-function normLabel(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}
-function tokenizeLabel(s){return normLabel(s).split(' ').filter(t=>t.length>=3);}
-function labelsClose(a,b){
-  const ta=tokenizeLabel(a),tb=tokenizeLabel(b);
-  if(ta.length===0||tb.length===0)return false;
-  const sa=new Set(ta),sb=new Set(tb);
-  let common=0;
-  for(const t of sa){if(sb.has(t))common++;}
-  if(common>=2)return true;
-  if(common===1){
-    const strong=['uber','sbb','cff','ibis','restaurant','brasserie','netflix','coop','migros','amazon','easyjet','manor'];
-    return [...sa].some(t=>sb.has(t)&&strong.includes(t));
-  }
-  const joinedA=ta.join(' '),joinedB=tb.join(' ');
-  return joinedA.includes(joinedB)||joinedB.includes(joinedA);
-}
-function labelScore(a,b){
-  const ta=tokenizeLabel(a),tb=tokenizeLabel(b);
-  if(ta.length===0||tb.length===0)return 0;
-  const sa=new Set(ta),sb=new Set(tb);
-  let common=0;
-  for(const t of sa){if(sb.has(t))common++;}
-  const base=common/Math.max(sa.size,sb.size);
-  const joinedA=ta.join(' '),joinedB=tb.join(' ');
-  if(joinedA===joinedB)return 1;
-  if(joinedA.includes(joinedB)||joinedB.includes(joinedA))return Math.max(base,0.9);
-  return base;
-}
-
-/* RECONCILIATION */
-function reconcile(expenses,ubsRows){
-  const matched=new Set();
-  const updated=expenses.map(exp=>{
-    const ea=Math.abs(exp.amountCHF||exp.amount),ed=new Date(exp.date);
-    let bestIdx=-1,bestScore=-1,bestRow=null;
-    for(let i=0;i<ubsRows.length;i++){
-      if(matched.has(i))continue;
-      const r=ubsRows[i];if(r.amount>=0)continue;
-      const ra=Math.abs(r.amount),dd=Math.abs((ed-new Date(r.date))/86400000),ap=ra>0?Math.abs(ea-ra)/ra:1;
-      if(dd<=2&&ap<=0.05&&labelsClose(exp.merchant,r.label)){
-        const score=(labelScore(exp.merchant,r.label)*1000)-dd*10-ap*100;
-        if(score>bestScore){bestScore=score;bestIdx=i;bestRow=r;}
-      }
-    }
-    if(bestIdx>=0){matched.add(bestIdx);return{...exp,status:'reconciled',ubsRow:bestRow,amtDiff:Math.abs(ea-Math.abs(bestRow.amount))>0.005?Math.abs(bestRow.amount)-ea:0};}
-    return {...exp,status:'pending',ubsRow:null,amtDiff:0};
+(async function(){
+  const sourceUrl='https://raw.githubusercontent.com/NumeriqAG/notesfrais/main/index.html';
+  const statsPlaceholder="function StatsTab({expenses,month,months}){return <div style={{maxWidth:900}}><h1 style={{fontSize:22,fontWeight:700,marginBottom:12}}>Statistiques</h1><div style={{fontSize:13,color:'var(--t3)'}}>Vue détaillée à venir</div></div>;}";
+  const statsReplacement=String.raw`function StatsTab({expenses,month,months}){
+  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;
+  const monthExpenses=expenses.filter(e=>e.date&&e.date.startsWith(month));
+  const total=monthExpenses.reduce((s,e)=>s+Number(e.amountCHF||e.amount||0),0);
+  const tva=monthExpenses.reduce((s,e)=>s+Number(e.tva||0),0);
+  const reconciled=monthExpenses.filter(e=>e.status==='reconciled').length;
+  const bycat=CATS.map(c=>({
+    ...c,
+    total:monthExpenses.filter(e=>e.category===c.id).reduce((s,e)=>s+Number(e.amountCHF||e.amount||0),0),
+    count:monthExpenses.filter(e=>e.category===c.id).length,
+  })).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
+  const merchants={};
+  monthExpenses.forEach(e=>{
+    const key=e.merchant||'Inconnu';
+    merchants[key]=(merchants[key]||0)+Number(e.amountCHF||e.amount||0);
   });
-  return{expenses:updated,forgotten:ubsRows.filter((r,i)=>!matched.has(i)&&r.amount<0)};
-}
-
-const UBS_DEMO=`UBS Switzerland AG\nCompte: CH56 0483 5012 3456 7800 9\n"Datum";"Buchungstext";"Betrag";"Saldo";"Währung"\n"01.03.2026";"Gutschrift Gehalt";"8'500.00";"12'840.20";"CHF"\n"02.03.2026";"Coop Supermarché";"-43.60";"12'796.60";"CHF"\n"03.03.2026";"Netflix";"-17.90";"12'778.70";"CHF"\n"05.03.2026";"Uber *Trip";"-18.50";"12'760.20";"CHF"\n"07.03.2026";"Brasserie de la Paix";"-67.20";"12'693.00";"CHF"\n"11.03.2026";"Ibis Budget Lausanne";"-89.00";"12'508.60";"CHF"\n"12.03.2026";"SBB CFF Billetterie";"-48.00";"12'460.60";"CHF"\n"13.03.2026";"SBB CFF Billetterie";"-32.00";"12'428.60";"CHF"\n"14.03.2026";"Restaurant Le Bistrot SA";"-45.80";"12'382.80";"CHF"`;
-
-const CATS=[{id:'repas',label:'Repas',icon:'🍽',color:'#E8F5E9'},{id:'transport',label:'Transport',icon:'🚆',color:'#E3F2FD'},{id:'hotel',label:'Hôtel',icon:'🏨',color:'#FFF3E0'},{id:'materiel',label:'Matériel',icon:'💻',color:'#F3E5F5'},{id:'autre',label:'Autre',icon:'📎',color:'#ECEFF1'}];
-const CMAP=Object.fromEntries(CATS.map(c=>[c.id,c]));
-const MONTHS=[{v:'2026-01',l:'Janvier 2026'},{v:'2026-02',l:'Février 2026'},{v:'2026-03',l:'Mars 2026'},{v:'2026-04',l:'Avril 2026'},{v:'2026-05',l:'Mai 2026'},{v:'2026-06',l:'Juin 2026'}];
-const fmt=n=>Number(n||0).toFixed(2);
-const fd=d=>new Date(d+'T00:00:00').toLocaleDateString('fr-CH',{day:'2-digit',month:'short'});
-const tot=arr=>arr.reduce((s,e)=>s+Math.abs(Number(e.amountCHF||e.amount||0)),0);
-const isPDF=u=>u&&u.toLowerCase().includes('.pdf');
-
-const bP={display:'inline-flex',alignItems:'center',gap:7,padding:'10px 16px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:500,cursor:'pointer'};
-const bS={display:'inline-flex',alignItems:'center',gap:6,padding:'9px 13px',background:'var(--s2)',color:'var(--text)',border:'0.5px solid var(--border)',borderRadius:10,fontSize:13,cursor:'pointer'};
-const inp={width:'100%',padding:'9px 12px',border:'0.5px solid var(--border)',borderRadius:9,fontSize:13,background:'var(--s2)',color:'var(--text)',outline:'none'};
-const lbl={display:'block',fontSize:11,color:'var(--t3)',marginBottom:5};
-
-function Badge({status}){
-  const c={pending:{bg:'var(--aml)',col:'var(--amber)',t:'En attente'},reconciled:{bg:'var(--gl)',col:'var(--green)',t:'✓ Réconcilié'}}[status]||{bg:'var(--s2)',col:'var(--t2)',t:status};
-  return <span style={{background:c.bg,color:c.col,fontSize:10,fontWeight:500,padding:'3px 8px',borderRadius:20,whiteSpace:'nowrap'}}>{c.t}</span>;
-}
-
-function ReceiptViewer({url,name,onClose}){
-  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;
+  const topMerchants=Object.entries(merchants).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const trend=months.map(m=>{
+    const items=expenses.filter(e=>e.date&&e.date.startsWith(m.v));
+    return {
+      label:m.l,
+      total:items.reduce((s,e)=>s+Number(e.amountCHF||e.amount||0),0),
+      count:items.length,
+    };
+  });
   return(
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:3000,padding:isMobile?10:20}}>
-      <div style={{width:'100%',maxWidth:640,background:'#fff',borderRadius:16,overflow:'hidden',boxShadow:'0 24px 80px rgba(0,0,0,0.5)'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:isMobile?'flex-start':'center',flexDirection:isMobile?'column':'row',gap:isMobile?10:0,padding:'14px 18px',borderBottom:'0.5px solid var(--border)'}}>
-          <div>
-            <div style={{fontWeight:600,fontSize:14}}>Justificatif</div>
-            <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>{name}</div>
-          </div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',width:isMobile?'100%':'auto'}}>
-            <a href={url} download={name} style={{...bS,textDecoration:'none',fontSize:12,padding:'7px 12px'}}>⬇ Télécharger</a>
-            <a href={url} target="_blank" rel="noreferrer" style={{...bS,textDecoration:'none',fontSize:12,padding:'7px 12px'}}>🔗 Ouvrir</a>
-            <button onClick={onClose} style={{...bS,fontSize:18,lineHeight:1,padding:'6px 12px'}}>×</button>
-          </div>
-        </div>
-        <div style={{maxHeight:'76vh',overflow:'auto',background:'#F5F3EF',display:'flex',alignItems:'center',justifyContent:'center',minHeight:300,padding:8}}>
-          {isPDF(url)
-            ?<iframe src={url} style={{width:'100%',height:'72vh',border:'none'}} title="justificatif"/>
-            :<img src={url} alt="justificatif" style={{maxWidth:'100%',maxHeight:'72vh',objectFit:'contain',display:'block',borderRadius:8}}/>
-          }
-        </div>
+    <div style={{maxWidth:860}}>
+      <div style={{marginBottom:24}}>
+        <h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Statistiques</h1>
+        <div style={{fontSize:13,color:'var(--t3)'}}>Vue synthétique du mois</div>
       </div>
-    </div>
-  );
-}
-
-function Thumb({url,name,onView}){
-  if(!url)return(
-    <div title="Aucun justificatif" style={{width:40,height:40,borderRadius:8,background:'var(--s2)',border:'1.5px dashed var(--border)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0,color:'var(--t3)'}}>📎</div>
-  );
-  return(
-    <div onClick={onView} title={`Voir: ${name}`} style={{width:40,height:40,borderRadius:8,overflow:'hidden',border:'1.5px solid var(--accent)',cursor:'pointer',flexShrink:0,background:'var(--al)',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
-      {isPDF(url)?<span style={{fontSize:20}}>📄</span>:<img src={url} alt="thumb" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
-    </div>
-  );
-}
-
-function AddModal({onClose,onAdd,month}){
-  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;
-  const todayISO=new Date().toISOString().split('T')[0];
-  const defaultDate=todayISO;
-  const [form,setForm]=useState({merchant:'',amount:'',tva:'',date:defaultDate,category:'repas',note:''});
-  const [file,setFile]=useState(null);
-  const [preview,setPreview]=useState(null);
-  const [uploading,setUploading]=useState(false);
-  const [ocrStatus,setOcrStatus]=useState(null);
-  const [ocrProgress,setOcrProgress]=useState(0);
-  const [err,setErr]=useState('');
-  const fRef=useRef();
-
-  const runOCR=async(imgFile)=>{
-    if(!imgFile.type.startsWith('image/'))return;
-    setOcrStatus('scanning');setOcrProgress(0);
-    try{
-      if(!window.Tesseract){
-        await new Promise((resolve,reject)=>{
-          const s=document.createElement('script');
-          s.src='https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
-          s.onload=resolve;s.onerror=reject;
-          document.head.appendChild(s);
-        });
-      }
-      const result=await window.Tesseract.recognize(imgFile,'fra+eng',{logger:m=>{if(m.status==='recognizing text')setOcrProgress(Math.round(m.progress*100));}});
-      const text=result.data.text;
-      const amounts=[];
-      const amtRegex=/(\d{1,4}[.,]\d{2})/g;
-      let m;while((m=amtRegex.exec(text))!==null){const v=parseFloat(m[1].replace(',','.'));if(!isNaN(v)&&v>0)amounts.push(v);}
-      const maxAmt=amounts.length>0?Math.max(...amounts):null;
-      const tvaMatch=text.match(/TVA[:\s]*(\d+[.,]\d{2})/i);
-      const dateMatch=text.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/);
-      let extractedDate=null;
-      if(dateMatch){
-        const d=dateMatch[1].padStart(2,'0'),mo=dateMatch[2].padStart(2,'0');
-        let y=dateMatch[3];if(y.length===2)y='20'+y;
-        extractedDate=`${y}-${mo}-${d}`;
-        const dt=new Date(extractedDate);
-        if(isNaN(dt.getTime())||dt.getFullYear()<2020)extractedDate=null;
-      }
-      const lines=text.split('\n').map(l=>l.trim()).filter(l=>l.length>3&&!/^\d+$/.test(l));
-      const merchant=lines[0]?.substring(0,50)||'';
-      setForm(f=>({...f,merchant:merchant||f.merchant,amount:maxAmt?maxAmt.toFixed(2):f.amount,tva:tvaMatch?parseFloat(tvaMatch[1].replace(',','.')).toFixed(2):f.tva,date:extractedDate||f.date}));
-      setOcrStatus('done');
-    }catch(e){console.error('OCR error:',e);setOcrStatus('error');}
-  };
-
-  const handleFile=f=>{
-    if(!f)return;
-    setFile(f);
-    if(f.type.startsWith('image/')){
-      const r=new FileReader();
-      r.onload=e=>{setPreview(e.target.result);runOCR(f);};
-      r.readAsDataURL(f);
-    }else{setPreview('pdf');}
-  };
-
-  const confirm=async()=>{
-    if(!form.merchant){setErr('Le commerçant est obligatoire');return;}
-    if(!form.amount||isNaN(parseFloat(form.amount))){setErr('Le montant est obligatoire');return;}
-    setUploading(true);setErr('');
-    try{
-      let receiptUrl=null,receiptName=null;
-      if(file){const u=await uploadReceipt(file);receiptUrl=u.url;receiptName=u.name;}
-      await onAdd({...form,currency:'CHF',amountCHF:parseFloat(form.amount),amount:parseFloat(form.amount),tva:parseFloat(form.tva)||0,status:'pending',receiptUrl,receiptName});
-      onClose();
-    }catch(e){setErr('Erreur upload: '+e.message);}finally{setUploading(false);}
-  };
-
-  return(
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:isMobile?'flex-end':'center',justifyContent:'center',zIndex:1000,padding:isMobile?0:16}}>
-      <div style={{background:'#fff',borderRadius:isMobile?'18px 18px 0 0':18,padding:isMobile?18:24,width:'100%',maxWidth:isMobile?'100%':480,maxHeight:isMobile?'92dvh':'92vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-          <div style={{fontSize:16,fontWeight:600}}>Ajouter un frais</div>
-          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'var(--t2)',fontSize:24,lineHeight:1}}>×</button>
-        </div>
-        <div style={{display:'grid',gap:12}}>
-          <div>
-            <label style={lbl}>Justificatif — photo ou PDF</label>
-            <input ref={fRef} type="file" accept="image/*,.pdf" capture="environment" style={{display:'none'}} onChange={e=>{if(e.target.files[0])handleFile(e.target.files[0]);}}/>
-            {!file
-              ?<div onClick={()=>fRef.current.click()} onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.background='var(--al)'}} onDragLeave={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.background='var(--s2)'}} onDrop={e=>{e.preventDefault();e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.background='var(--s2)';if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);}} style={{border:'2px dashed var(--border)',borderRadius:10,padding:20,textAlign:'center',background:'var(--s2)',cursor:'pointer',transition:'all 0.15s'}}>
-                  <div style={{fontSize:28,marginBottom:6}}>📎</div>
-                  <div style={{fontSize:13,fontWeight:500,marginBottom:2}}>Glissez ou cliquez pour ajouter</div>
-                  <div style={{fontSize:11,color:'var(--t3)'}}>Photo du ticket ou PDF</div>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(4,1fr)',gap:12,marginBottom:20}}>
+        {[
+          {label:'Total',value:'CHF '+fmt(total),sub:monthExpenses.length+' frais'},
+          {label:'TVA',value:'CHF '+fmt(tva),sub:'récupérable'},
+          {label:'Réconciliés',value:reconciled+'/'+monthExpenses.length,sub:(monthExpenses.length?Math.round(reconciled/monthExpenses.length*100):0)+'%'},
+          {label:'Panier moyen',value:'CHF '+fmt(monthExpenses.length?total/monthExpenses.length:0),sub:'par dépense'},
+        ].map(card=>(
+          <div key={card.label} style={{background:'#fff',borderRadius:12,padding:'16px 18px',border:'0.5px solid var(--border)'}}>
+            <div style={{fontSize:10,color:'var(--t3)',marginBottom:6,letterSpacing:'0.04em'}}>{card.label.toUpperCase()}</div>
+            <div style={{fontSize:18,fontWeight:700,fontFamily:'DM Mono'}}>{card.value}</div>
+            <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{card.sub}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1.1fr 0.9fr',gap:16,marginBottom:16}}>
+        <div style={{background:'#fff',borderRadius:14,padding:20,border:'0.5px solid var(--border)'}}>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Répartition par catégorie</div>
+          {bycat.length===0&&<div style={{fontSize:13,color:'var(--t3)'}}>Aucune dépense sur cette période.</div>}
+          {bycat.map(cat=>{
+            const pct=total?Math.round(cat.total/total*100):0;
+            return(
+              <div key={cat.id} style={{marginBottom:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:5,alignItems:'center'}}>
+                  <span style={{fontWeight:500}}>{cat.icon+' '+cat.label+' · '+cat.count+' frais'}</span>
+                  <span style={{fontFamily:'DM Mono',fontWeight:600,whiteSpace:'nowrap'}}>CHF {fmt(cat.total)} <span style={{color:'var(--t3)',fontWeight:400,fontSize:11}}>({pct}%)</span></span>
                 </div>
-              :<div style={{display:'flex',gap:10,alignItems:'center',padding:'10px 14px',background:'var(--gl)',borderRadius:10,border:'0.5px solid #9FE1CB'}}>
-                  {preview==='pdf'?<span style={{fontSize:28}}>📄</span>:<img src={preview} alt="preview" style={{width:48,height:48,objectFit:'cover',borderRadius:6}}/>}
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:500,fontSize:13,color:'var(--green)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{file.name}</div>
-                    {ocrStatus==='scanning'&&<div style={{marginTop:4}}><div style={{fontSize:11,color:'var(--green)',marginBottom:3}}>⚙ OCR en cours… {ocrProgress}%</div><div style={{height:3,background:'#9FE1CB',borderRadius:99}}><div style={{width:`${ocrProgress}%`,height:'100%',background:'var(--green)',borderRadius:99,transition:'width 0.3s'}}/></div></div>}
-                    {ocrStatus==='done'&&<div style={{fontSize:11,color:'var(--green)',marginTop:3}}>✓ OCR terminé — données extraites automatiquement</div>}
-                    {ocrStatus==='error'&&<div style={{fontSize:11,color:'var(--amber)',marginTop:3}}>⚠ OCR indisponible — saisissez manuellement</div>}
-                    {!ocrStatus&&<div style={{fontSize:11,color:'#0F6E56',marginTop:2}}>{(file.size/1024).toFixed(0)} KB · stocké dans Supabase</div>}
-                  </div>
-                  <button onClick={()=>{setFile(null);setPreview(null);setOcrStatus(null);setOcrProgress(0);}} style={{background:'none',border:'none',cursor:'pointer',color:'var(--green)',fontSize:20,lineHeight:1}}>×</button>
+                <div style={{height:6,background:'var(--s2)',borderRadius:99}}>
+                  <div style={{width:pct+'%',height:'100%',background:'var(--accent)',borderRadius:99}}></div>
                 </div>
-            }
-          </div>
-          <div><label style={lbl}>Commerçant *</label><input style={inp} value={form.merchant} onChange={e=>setForm({...form,merchant:e.target.value})} placeholder="Ex: Restaurant Le Bistrot" autoFocus/></div>
-          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:10}}>
-            <div><label style={lbl}>Montant CHF *</label><input style={inp} type="number" step="0.01" min="0" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} placeholder="0.00"/></div>
-            <div><label style={lbl}>TVA CHF</label><input style={inp} type="number" step="0.01" min="0" value={form.tva} onChange={e=>setForm({...form,tva:e.target.value})} placeholder="0.00"/></div>
-          </div>
-          <div><label style={lbl}>Date</label><input style={inp} type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/></div>
-          <div><label style={lbl}>Catégorie</label><select style={inp} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{CATS.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select></div>
-          <div><label style={lbl}>Note</label><input style={inp} value={form.note} onChange={e=>setForm({...form,note:e.target.value})} placeholder="Optionnel…"/></div>
+              </div>
+            );
+          })}
         </div>
-        {err&&<div style={{background:'var(--rl)',color:'var(--red)',borderRadius:8,padding:'8px 12px',fontSize:13,marginTop:10}}>{err}</div>}
-        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:8,marginTop:16,paddingBottom:isMobile?12:0}}>
-          <button onClick={onClose} style={{...bS,justifyContent:'center'}}>Annuler</button>
-          <button onClick={confirm} disabled={uploading} style={{...bP,justifyContent:'center',opacity:uploading?0.6:1}}>{uploading?'⏳ Upload en cours…':'✓ Confirmer'}</button>
+        <div style={{background:'#fff',borderRadius:14,padding:20,border:'0.5px solid var(--border)'}}>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Top commerçants</div>
+          {topMerchants.length===0&&<div style={{fontSize:13,color:'var(--t3)'}}>Aucune dépense sur cette période.</div>}
+          {topMerchants.map(([merchant,amount],idx)=>{
+            const pct=total?Math.round(amount/total*100):0;
+            return(
+              <div key={merchant} style={{marginBottom:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:5,alignItems:'center'}}>
+                  <span style={{fontWeight:idx===0?600:500}}>{merchant}</span>
+                  <span style={{fontFamily:'DM Mono',fontWeight:600,whiteSpace:'nowrap'}}>CHF {fmt(amount)}</span>
+                </div>
+                <div style={{height:5,background:'var(--s2)',borderRadius:99}}>
+                  <div style={{width:pct+'%',height:'100%',background:idx===0?'#1A3FB5':'#7EA5FF',borderRadius:99}}></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{background:'#fff',borderRadius:14,padding:20,border:'0.5px solid var(--border)'}}>
+        <div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Tendance par mois</div>
+        <div style={{display:'grid',gap:8}}>
+          {trend.map(item=>{
+            const max=Math.max(...trend.map(t=>t.total),1);
+            const pct=Math.round(item.total/max*100);
+            return(
+              <div key={item.label}>
+                <div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:4,alignItems:'center'}}>
+                  <span style={{color:'var(--t2)'}}>{item.label}</span>
+                  <span style={{fontFamily:'DM Mono',fontWeight:600,whiteSpace:'nowrap'}}>CHF {fmt(item.total)} <span style={{color:'var(--t3)',fontWeight:400,fontSize:11}}>({item.count} frais)</span></span>
+                </div>
+                <div style={{height:6,background:'var(--s2)',borderRadius:99}}>
+                  <div style={{width:pct+'%',height:'100%',background:'#0F6E56',borderRadius:99}}></div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
   );
-}
-
-function UBSModal({onClose,onImport}){
-  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;
-  const [step,setStep]=useState('upload');
-  const [parsed,setParsed]=useState(null);
-  const [error,setError]=useState(null);
-  const [drag,setDrag]=useState(false);
-  const fRef=useRef();
-  const process=text=>{setError(null);try{const r=parseUBS(text);if(r.rows.length===0){setError('Aucune transaction détectée.');return;}setParsed(r);setStep('preview');}catch(e){setError('Erreur: '+e.message);}};
-  const hFile=f=>{const r=new FileReader();r.onload=e=>process(e.target.result);r.readAsText(f,'UTF-8');};
-  const exp=parsed?.rows.filter(r=>r.amount<0)||[];
-  const inc=parsed?.rows.filter(r=>r.amount>0)||[];
-  return(
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:isMobile?'flex-end':'center',justifyContent:'center',zIndex:1000,padding:isMobile?0:16}}>
-      <div style={{background:'#fff',borderRadius:isMobile?'18px 18px 0 0':18,padding:isMobile?18:24,width:'100%',maxWidth:isMobile?'100%':480,maxHeight:isMobile?'92dvh':'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-          <div><div style={{fontSize:11,color:'var(--t3)',letterSpacing:'0.08em',marginBottom:2}}>UBS SWITZERLAND AG</div><div style={{fontSize:16,fontWeight:600}}>{step==='upload'?'Importer relevé UBS':'Vérifier les transactions'}</div></div>
-          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'var(--t2)',fontSize:24,lineHeight:1}}>×</button>
-        </div>
-        {step==='upload'&&<>
-          <input ref={fRef} type="file" accept=".csv,.txt" style={{display:'none'}} onChange={e=>{if(e.target.files[0])hFile(e.target.files[0]);}}/>
-          <div onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);if(e.dataTransfer.files[0])hFile(e.dataTransfer.files[0]);}} onClick={()=>fRef.current.click()} style={{border:`2px dashed ${drag?'var(--accent)':'var(--border)'}`,borderRadius:12,padding:32,textAlign:'center',background:drag?'var(--al)':'var(--s2)',cursor:'pointer',marginBottom:16}}>
-            <div style={{fontSize:44,marginBottom:10}}>🏦</div>
-            <div style={{fontWeight:500,fontSize:14,marginBottom:4}}>Glissez votre CSV UBS</div>
-            <div style={{fontSize:12,color:'var(--t3)'}}>ou cliquez pour parcourir</div>
-          </div>
-          <div style={{background:'var(--al)',borderRadius:10,padding:14,marginBottom:14,fontSize:12}}>
-            <div style={{fontWeight:500,color:'var(--accent)',marginBottom:8}}>Export depuis UBS e-banking</div>
-            {['E-banking → Comptes et cartes','Sélectionner votre carte CB','Transactions → Exporter → CSV','Télécharger le .csv'].map((s,i)=>(<div key={i} style={{display:'flex',gap:8,marginBottom:5,alignItems:'center'}}><span style={{width:16,height:16,borderRadius:'50%',background:'var(--accent)',color:'#fff',fontSize:9,fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</span><span style={{color:'var(--t2)'}}>{s}</span></div>))}
-          </div>
-          {error&&<div style={{background:'var(--rl)',color:'var(--red)',borderRadius:8,padding:'8px 12px',fontSize:13,marginBottom:12}}>{error}</div>}
-          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:8}}>
-            <button onClick={()=>fRef.current.click()} style={{...bS,justifyContent:'center'}}>📂 Parcourir</button>
-            <button onClick={()=>process(UBS_DEMO)} style={{...bP,justifyContent:'center'}}>🧪 Données démo</button>
-          </div>
-        </>}
-        {step==='preview'&&parsed&&<>
-          {parsed.info&&<div style={{background:'var(--gl)',borderRadius:9,padding:'8px 12px',marginBottom:12,fontSize:12,color:'var(--green)'}}>🏦 {parsed.info}</div>}
-          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr 1fr',gap:8,marginBottom:14}}>
-            {[{l:'Dépenses',v:exp.length,bg:'var(--rl)',c:'var(--red)'},{l:'Revenus',v:inc.length,bg:'var(--gl)',c:'var(--green)'},{l:'Total',v:parsed.rows.length,bg:'var(--al)',c:'var(--accent)'}].map(s=>(<div key={s.l} style={{background:s.bg,borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:20,fontWeight:700,fontFamily:'DM Mono',color:s.c}}>{s.v}</div><div style={{fontSize:10,color:s.c,marginTop:2}}>{s.l}</div></div>))}
-          </div>
-          <div style={{maxHeight:260,overflowY:'auto',background:'var(--s2)',borderRadius:10,padding:8,marginBottom:14}}>
-            {exp.slice(0,20).map((r,i)=>(<div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 10px',borderBottom:i<exp.slice(0,20).length-1?'0.5px solid var(--border)':'none',fontSize:12,gap:10}}><div style={{minWidth:0,flex:1}}><div style={{fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.label||'Sans libellé'}</div><div style={{color:'var(--t3)',fontSize:11,marginTop:2}}>{fd(r.date)}</div></div><div style={{fontFamily:'DM Mono',fontWeight:600,color:'var(--red)',whiteSpace:'nowrap'}}>CHF {fmt(Math.abs(r.amount))}</div></div>))}
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:8}}>
-            <button onClick={()=>setStep('upload')} style={{...bS,justifyContent:'center'}}>← Retour</button>
-            <button onClick={()=>{onImport(parsed.rows);onClose();}} style={{...bP,justifyContent:'center'}}>✓ Importer {parsed.rows.length} lignes</button>
-          </div>
-        </>}
-      </div>
-    </div>
-  );
-}
-
-function StatsTab({expenses,month,months}){return <div style={{maxWidth:900}}><h1 style={{fontSize:22,fontWeight:700,marginBottom:12}}>Statistiques</h1><div style={{fontSize:13,color:'var(--t3)'}}>Vue détaillée à venir</div></div>;}
-
-function App(){
-  const [tab,setTab]=useState('home');
-  const [expenses,setExpenses]=useState([]);
-  const [forgotten,setForgotten]=useState([]);
-  const [ubsLoaded,setUbsLoaded]=useState(false);
-  const [loading,setLoading]=useState(true);
-  const [syncing,setSyncing]=useState(false);
-  const [showUBS,setShowUBS]=useState(false);
-  const [showAdd,setShowAdd]=useState(false);
-  const [submitted,setSubmitted]=useState(false);
-  const [notif,setNotif]=useState(null);
-  const [filterCat,setFilterCat]=useState('all');
-  const [dbError,setDbError]=useState(null);
-  const [month,setMonth]=useState('2026-03');
-  const [viewer,setViewer]=useState(null);
-  const [viewportWidth,setViewportWidth]=useState(typeof window!=='undefined'?window.innerWidth:1280);
-
-  const notify=(msg,dur=4000)=>{setNotif(msg);setTimeout(()=>setNotif(null),dur);};
-  const loadData=useCallback(async()=>{setLoading(true);setDbError(null);try{const d=await fetchExpenses(month);setExpenses(d);}catch(e){setDbError(e.message);}finally{setLoading(false);}},[month]);
-  useEffect(()=>{loadData();},[loadData]);
-  useEffect(()=>{const onResize=()=>setViewportWidth(window.innerWidth);onResize();window.addEventListener('resize',onResize);return()=>window.removeEventListener('resize',onResize);},[]);
-
-  const addExpense=useCallback(async(e)=>{setSyncing(true);try{const s=await insertExpense(e);setExpenses(p=>[s,...p]);notify('✅ Frais enregistré !');}catch(e){notify('❌ '+e.message);}finally{setSyncing(false);}},[]);
-  const deleteExpense=useCallback(async(id,receiptUrl)=>{try{await deleteById(id,receiptUrl);setExpenses(p=>p.filter(e=>e.id!==id));notify('🗑 Frais supprimé');}catch(e){notify('❌ Erreur: '+e.message);}},[]);
-  const handleUBS=useCallback(async(rows)=>{
-    setSyncing(true);
-    const mr=rows.filter(r=>r.date.startsWith(month));
-    const monthExpenses=expenses.filter(e=>e.date?.startsWith(month));
-    const otherExpenses=expenses.filter(e=>!e.date?.startsWith(month));
-    const resetMonthExpenses=monthExpenses.map(e=>({...e,status:'pending',ubsRow:null,amtDiff:0}));
-    const{expenses:recMonth,forgotten:forg}=reconcile(resetMonthExpenses,mr);
-    const changed=recMonth.filter(n=>{const prev=monthExpenses.find(e=>e.id===n.id);if(!prev)return false;const prevLabel=prev.ubsRow?.label||'';const nextLabel=n.ubsRow?.label||'';const prevDate=prev.ubsRow?.date||null;const nextDate=n.ubsRow?.date||null;const prevDiff=Number(prev.amtDiff||0);const nextDiff=Number(n.amtDiff||0);return prev.status!==n.status||prevLabel!==nextLabel||prevDate!==nextDate||Math.abs(prevDiff-nextDiff)>0.005;});
-    await Promise.all(changed.map(e=>updateStatus(e.id,e.status,e.ubsRow?.label||'',e.ubsRow?.date||null,e.amtDiff||0)));
-    const rec=[...otherExpenses,...recMonth].sort((a,b)=>new Date(b.date)-new Date(a.date));
-    setExpenses(rec);setForgotten(forg);setUbsLoaded(true);setSyncing(false);
-    notify('✅ Relevé UBS importé');
-    setTab('recon');
-  },[expenses,month]);
-  const addForgotten=useCallback(async(cb)=>{await addExpense({date:cb.date,merchant:cb.label,amount:Math.abs(cb.amount),tva:0,category:'autre',currency:'CHF',amountCHF:Math.abs(cb.amount),status:'pending',note:'⚠ Importé depuis UBS'});setForgotten(p=>p.filter(f=>f!==cb));},[addExpense]);
-
-  const monthCounts=useMemo(()=>expenses.reduce((acc,e)=>{if(e.date){const key=e.date.slice(0,7);acc[key]=(acc[key]||0)+1;}return acc;},{}),[expenses]);
-  const mE=useMemo(()=>expenses.filter(e=>e.date?.startsWith(month)),[expenses,month]);
-  const fil=useMemo(()=>mE.filter(e=>filterCat==='all'||e.category===filterCat),[mE,filterCat]);
-  const rec=mE.filter(e=>e.status==='reconciled');
-  const pend=mE.filter(e=>e.status==='pending');
-  const mT=tot(mE);
-  const tva=mE.reduce((s,e)=>s+Number(e.tva||0),0);
-  const pct=mE.length>0?Math.round(rec.length/mE.length*100):0;
-  const bycat=CATS.map(c=>({...c,t:mE.filter(e=>e.category===c.id).reduce((s,e)=>s+Number(e.amountCHF||0),0)})).filter(c=>c.t>0);
-  const isMobile=viewportWidth<860;
-
-  if(loading)return(<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'100dvh',gap:16,background:'var(--bg)',padding:20}}><div style={{fontSize:48}}>🏦</div><div style={{fontWeight:600,fontSize:16}}>Connexion à Supabase…</div><div style={{fontSize:13,color:'var(--t3)'}}>Chargement des frais de Mike</div></div>);
-
-  const ML=MONTHS.find(m2=>m2.v===month)?.l||month;
-
-  return(
-    <div style={{display:'flex',flexDirection:isMobile?'column':'row',minHeight:'100dvh',height:isMobile?'auto':'100vh',overflow:'hidden'}}>
-      {notif&&<div style={{position:'fixed',top:isMobile?10:16,left:'50%',transform:'translateX(-50%)',background:'#1A1A1A',color:'#fff',padding:isMobile?'10px 14px':'10px 20px',borderRadius:20,fontSize:13,zIndex:2000,whiteSpace:'nowrap',maxWidth:isMobile?'calc(100vw - 24px)':'none',overflow:'hidden',textOverflow:'ellipsis',boxShadow:'0 4px 20px rgba(0,0,0,0.3)'}}>{notif}</div>}
-      {syncing&&<div style={{position:'fixed',top:0,left:0,right:0,height:3,background:'var(--accent)',zIndex:1900}}/>}
-      {viewer&&<ReceiptViewer url={viewer.url} name={viewer.name} onClose={()=>setViewer(null)}/>}
-
-      <div style={{width:isMobile?'100%':220,background:'#fff',borderRight:isMobile?'none':'0.5px solid var(--border)',borderBottom:isMobile?'0.5px solid var(--border)':'none',display:'flex',flexDirection:'column',flexShrink:0,overflowY:'auto',position:isMobile?'sticky':'relative',top:0,zIndex:isMobile?30:1,boxShadow:isMobile?'0 8px 24px rgba(26,26,26,0.06)':'none'}}>
-        <div style={{padding:isMobile?'16px 16px 12px':'24px 20px 16px'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.1em',marginBottom:4}}>NOTES DE FRAIS</div><div style={{fontSize:18,fontWeight:700}}>Mike</div><div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}><span style={{width:7,height:7,borderRadius:'50%',background:dbError?'var(--red)':'var(--green)',display:'inline-block'}}/><span style={{fontSize:11,color:dbError?'var(--red)':'var(--green)'}}>{dbError?'Erreur connexion':'Supabase connecté'}</span></div></div>
-        <div style={{padding:isMobile?'0 12px 10px':'0 12px 12px'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.08em',padding:'0 8px',marginBottom:6}}>PÉRIODE</div><div style={{display:'flex',flexDirection:isMobile?'row':'column',gap:isMobile?8:0,overflowX:isMobile?'auto':'visible',paddingBottom:isMobile?4:0,WebkitOverflowScrolling:'touch'}}>{MONTHS.map(m=><button key={m.v} onClick={()=>setMonth(m.v)} style={{width:isMobile?'auto':'100%',minWidth:isMobile?132:'auto',textAlign:'left',padding:'7px 12px',borderRadius:8,border:'none',background:month===m.v?'var(--al)':'none',color:month===m.v?'var(--accent)':'var(--t2)',fontSize:13,fontWeight:month===m.v?500:400,cursor:'pointer',marginBottom:isMobile?0:2,display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexShrink:0}}><span>{m.l}</span>{monthCounts[m.v]>0&&<span style={{minWidth:20,height:20,padding:'0 6px',borderRadius:999,background:month===m.v?'rgba(26,63,181,0.12)':'var(--s2)',color:month===m.v?'var(--accent)':'var(--t3)',fontSize:11,fontWeight:600,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{monthCounts[m.v]}</span>}</button>)}</div></div>
-        <div style={{height:'0.5px',background:'var(--border)',margin:'0 16px'}}/>
-        <div style={{padding:'12px'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.08em',padding:'0 8px',marginBottom:6}}>NAVIGATION</div><div style={{display:'flex',flexDirection:isMobile?'row':'column',gap:isMobile?8:0,overflowX:isMobile?'auto':'visible',paddingBottom:isMobile?4:0,WebkitOverflowScrolling:'touch'}}>{[['home','🏠','Accueil'],['history','📋','Historique'],['stats','📊','Statistiques'],['recon','🏦','Relevé UBS']].map(([id,ic,lb])=><button key={id} onClick={()=>setTab(id)} style={{width:isMobile?'auto':'100%',minWidth:isMobile?120:'auto',textAlign:'left',padding:'8px 12px',borderRadius:8,border:'none',background:tab===id?'var(--al)':'none',color:tab===id?'var(--accent)':'var(--t2)',fontSize:13,fontWeight:tab===id?500:400,cursor:'pointer',marginBottom:isMobile?0:2,display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}><span>{ic} {lb}</span></button>)}</div></div>
-        <div style={{flex:isMobile?0:1}}/>
-        <div style={{padding:16,borderTop:'0.5px solid var(--border)',display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'1fr',gap:8}}><button onClick={()=>setShowAdd(true)} style={{...bP,width:'100%',justifyContent:'center',marginBottom:0}}>+ Ajouter un frais</button><button onClick={()=>setShowUBS(true)} style={{...bS,width:'100%',justifyContent:'center',border:ubsLoaded?'1.5px solid var(--green)':'0.5px solid var(--border)',color:ubsLoaded?'var(--green)':'var(--t2)',fontSize:12}}>{ubsLoaded?'✓ UBS chargé':'🏦 Import relevé UBS'}</button></div>
-      </div>
-
-      <div style={{flex:1,overflowY:'auto',padding:isMobile?16:28}}>
-        {dbError&&<div style={{background:'var(--rl)',borderRadius:12,padding:16,marginBottom:20,fontSize:13,color:'var(--red)',maxWidth:600}}><div style={{fontWeight:600,marginBottom:4}}>❌ Erreur Supabase</div><div style={{marginBottom:8}}>{dbError}</div><button onClick={loadData} style={{...bS,color:'var(--red)',borderColor:'#F09595',fontSize:12}}>🔄 Réessayer</button></div>}
-
-        {tab==='home'&&<div style={{maxWidth:isMobile?'100%':720}}><div style={{marginBottom:24}}><h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>{ML}</h1><div style={{fontSize:13,color:'var(--t3)'}}>Tableau de bord des frais professionnels</div></div><div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(4,1fr)',gap:12,marginBottom:24}}>{[{l:'Total',v:`CHF ${fmt(mT)}`,s:`${mE.length} frais`},{l:'TVA',v:`CHF ${fmt(tva)}`,s:'récupérable'},{l:'Réconciliés',v:`${rec.length}/${mE.length}`,s:`${pct}%`},{l:'Oubliés',v:forgotten.length,s:forgotten.length>0?'à régulariser':'aucun ✓'}].map((k,i)=><div key={i} style={{background:'#fff',borderRadius:12,padding:'16px 18px',border:'0.5px solid var(--border)'}}><div style={{fontSize:10,color:'var(--t3)',marginBottom:6,letterSpacing:'0.03em'}}>{k.l.toUpperCase()}</div><div style={{fontSize:20,fontWeight:700,fontFamily:'DM Mono',color:i===3&&forgotten.length>0?'var(--red)':'var(--text)'}}>{k.v}</div><div style={{fontSize:11,color:'var(--t3)',marginTop:3}}>{k.s}</div></div>)}</div><div style={{background:'#1A3FB5',borderRadius:14,padding:20,color:'#fff',marginBottom:20}}><div style={{display:'flex',justifyContent:'space-between',flexDirection:isMobile?'column':'row',gap:isMobile?12:0,marginBottom:16}}><div><div style={{fontSize:11,opacity:0.65,letterSpacing:'0.08em',marginBottom:4}}>RÉCONCILIATION UBS</div><div style={{fontSize:28,fontWeight:700,fontFamily:'DM Mono'}}>{pct}%</div></div><div style={{textAlign:isMobile?'left':'right',fontSize:12,opacity:0.8}}><div>{rec.length} réconciliés</div><div>{pend.length} en attente</div></div></div><div style={{height:6,background:'rgba(255,255,255,0.2)',borderRadius:99}}><div style={{width:`${pct}%`,height:'100%',background:pct===100?'#7CEFA0':'#FBD761',borderRadius:99,transition:'width 0.6s'}}/></div></div>{bycat.length>0&&<div style={{background:'#fff',borderRadius:12,padding:20,border:'0.5px solid var(--border)',marginBottom:20}}><div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Répartition par catégorie</div>{bycat.sort((a,b)=>b.t-a.t).map(c=>{const p=mT>0?Math.round(c.t/mT*100):0;return(<div key={c.id} style={{marginBottom:12}}><div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:5}}><span style={{fontWeight:500}}>{c.icon} {c.label}</span><span style={{fontFamily:'DM Mono',fontWeight:600}}>CHF {fmt(c.t)} <span style={{color:'var(--t3)',fontWeight:400,fontSize:11}}>({p}%)</span></span></div><div style={{height:6,background:'var(--s2)',borderRadius:99}}><div style={{width:`${p}%`,height:'100%',background:'var(--accent)',borderRadius:99}}/></div></div>);})}</div>}<button onClick={()=>{setSubmitted(true);notify('📧 Frais soumis au service RH !');setTimeout(()=>setSubmitted(false),3000);}} style={{...bP,width:isMobile?'100%':'auto',justifyContent:'center',padding:'14px 24px',background:submitted?'var(--green)':'var(--accent)',transition:'background 0.3s',fontSize:14}}>{submitted?'✓ Frais soumis !':'📤 Soumettre les frais du mois'}</button></div>}
-
-        {tab==='history'&&<div style={{maxWidth:isMobile?'100%':800}}><div style={{marginBottom:20}}><h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Historique</h1><div style={{fontSize:13,color:'var(--t3)'}}>{ML} · {fil.length} frais · {fil.filter(e=>e.receiptUrl).length} avec justificatif</div></div><div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>{[{id:'all',label:'Tous',icon:''},...CATS].map(c=><button key={c.id} onClick={()=>setFilterCat(c.id)} style={{padding:'6px 14px',borderRadius:20,fontSize:12,cursor:'pointer',border:filterCat===c.id?'2px solid var(--accent)':'0.5px solid var(--border)',background:filterCat===c.id?'var(--al)':'#fff',color:filterCat===c.id?'var(--accent)':'var(--t2)',fontWeight:filterCat===c.id?500:400}}>{c.icon?`${c.icon} ${c.label}`:c.label}</button>)}</div>{fil.length===0?<div style={{textAlign:'center',padding:'60px 20px',color:'var(--t3)'}}><div style={{fontSize:48,marginBottom:12}}>📝</div><div style={{fontWeight:500,fontSize:16,marginBottom:4}}>Aucun frais pour ce mois</div><button onClick={()=>setShowAdd(true)} style={{...bP,display:'inline-flex',marginTop:12}}>+ Ajouter un frais</button></div>:<div style={{background:'#fff',borderRadius:12,border:'0.5px solid var(--border)',overflow:'hidden'}}>{fil.map((e,i)=><div key={e.id} style={{display:'flex',gap:14,alignItems:isMobile?'stretch':'center',flexDirection:isMobile?'column':'row',padding:'14px 18px',borderBottom:i<fil.length-1?'0.5px solid var(--border)':'none'}}><div style={{width:44,height:44,borderRadius:10,background:CMAP[e.category]?.color||'#eee',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>{CMAP[e.category]?.icon||'📎'}</div><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:14,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{e.merchant}</div><div style={{fontSize:12,color:'var(--t3)',marginTop:3,display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}><span>{fd(e.date)}</span><Badge status={e.status}/>{e.note&&<span>· {e.note}</span>}</div>{e.ubsRow&&<div style={{fontSize:11,color:'var(--green)',marginTop:3}}>↳ UBS: {e.ubsRow.label}</div>}</div><Thumb url={e.receiptUrl} name={e.receiptName||'justificatif'} onView={e.receiptUrl?()=>setViewer({url:e.receiptUrl,name:e.receiptName||'justificatif'}):null}/><div style={{textAlign:isMobile?'left':'right',flexShrink:0,minWidth:isMobile?'100%':90,width:isMobile?'100%':'auto'}}><div style={{fontWeight:700,fontFamily:'DM Mono',fontSize:15}}>CHF {fmt(e.amountCHF||e.amount)}</div>{e.tva>0&&<div style={{fontSize:11,color:'var(--t3)'}}>TVA {fmt(e.tva)}</div>}<div style={{display:'flex',gap:8,justifyContent:isMobile?'flex-start':'flex-end',marginTop:4,alignItems:'center'}}>{e.receiptUrl&&<a href={e.receiptUrl} download={e.receiptName||'justificatif'} title="Télécharger le justificatif" style={{color:'var(--accent)',fontSize:15,textDecoration:'none',padding:2,lineHeight:1}} onClick={ev=>ev.stopPropagation()}>⬇</a>}<button onClick={()=>deleteExpense(e.id,e.receiptUrl)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--t3)',fontSize:14,padding:2}} title="Supprimer">🗑</button></div></div></div>)}</div>}</div>}
-
-        {tab==='recon'&&<div style={{maxWidth:isMobile?'100%':680}}><div style={{marginBottom:20}}><h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Relevé UBS</h1><div style={{fontSize:13,color:'var(--t3)'}}>Réconciliation automatique</div></div>{!ubsLoaded?<div style={{textAlign:'center',padding:'60px 20px',background:'#fff',borderRadius:12,border:'0.5px solid var(--border)'}}><div style={{fontSize:56,marginBottom:16}}>🏦</div><div style={{fontWeight:600,fontSize:17,marginBottom:8}}>Aucun relevé UBS importé</div><div style={{fontSize:13,color:'var(--t3)',marginBottom:24,lineHeight:1.7}}>Importez votre CSV UBS e-banking pour réconcilier automatiquement</div><button onClick={()=>setShowUBS(true)} style={{...bP,fontSize:14,padding:'12px 24px'}}>🏦 Importer relevé UBS</button></div>:<><div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:12,marginBottom:20}}>{[{l:'Réconciliés',v:rec.length,bg:'var(--gl)',c:'var(--green)'},{l:'En attente',v:pend.length,bg:'var(--aml)',c:'var(--amber)'},{l:'Oubliés',v:forgotten.length,bg:'var(--rl)',c:'var(--red)'}].map(s=><div key={s.l} style={{background:s.bg,borderRadius:12,padding:16,textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,fontFamily:'DM Mono',color:s.c}}>{s.v}</div><div style={{fontSize:12,color:s.c,marginTop:4}}>{s.l}</div></div>)}</div>{rec.length>0&&<div style={{marginBottom:20}}><div style={{fontSize:12,fontWeight:600,color:'var(--green)',marginBottom:10}}>✅ Réconciliés avec UBS</div><div style={{background:'#fff',borderRadius:12,border:'0.5px solid var(--border)',overflow:'hidden'}}>{rec.map((e,i)=><div key={e.id} style={{display:'flex',justifyContent:'space-between',alignItems:isMobile?'stretch':'center',flexDirection:isMobile?'column':'row',padding:'12px 18px',borderBottom:i<rec.length-1?'0.5px solid var(--border)':'none',gap:12}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500}}>{e.merchant}</div><div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>{fd(e.date)}</div>{e.ubsRow&&<div style={{fontSize:11,color:'var(--green)',marginTop:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>↳ {e.ubsRow.label}</div>}</div><Thumb url={e.receiptUrl} name={e.receiptName} onView={e.receiptUrl?()=>setViewer({url:e.receiptUrl,name:e.receiptName||'justificatif'}):null}/><div style={{textAlign:isMobile?'left':'right',flexShrink:0,width:isMobile?'100%':'auto'}}><div style={{fontFamily:'DM Mono',fontWeight:700}}>CHF {fmt(e.amountCHF||e.amount)}</div>{e.amtDiff&&Math.abs(e.amtDiff)>0.005?<div style={{fontSize:11,color:'var(--amber)'}}>Écart {fmt(e.amtDiff)}</div>:null}</div></div>)}</div></div>}{forgotten.length>0&&<div style={{marginBottom:20}}><div style={{fontSize:12,fontWeight:600,color:'var(--red)',marginBottom:10}}>⚠ Dans UBS — sans justificatif</div><div style={{display:'grid',gap:8}}>{forgotten.map((f,i)=><div key={i} style={{background:'var(--rl)',borderRadius:10,padding:'12px 16px',border:'0.5px solid #F7C1C1',display:'flex',justifyContent:'space-between',flexDirection:isMobile?'column':'row',alignItems:isMobile?'stretch':'center',gap:isMobile?10:0}}><div><div style={{fontWeight:500,color:'#791F1F'}}>{f.label}</div><div style={{fontSize:11,color:'#A32D2D',marginTop:2}}>{fd(f.date)}</div></div><div style={{display:'flex',gap:10,alignItems:'center',justifyContent:isMobile?'space-between':'flex-end'}}><span style={{fontFamily:'DM Mono',fontWeight:700,color:'var(--red)'}}>CHF {fmt(Math.abs(f.amount))}</span><button onClick={()=>addForgotten(f)} style={{...bS,padding:'6px 12px',fontSize:12,color:'var(--red)',borderColor:'#F09595'}}>+ Créer</button></div></div>)}</div></div>}{pend.length>0&&<div><div style={{fontSize:12,fontWeight:600,color:'var(--amber)',marginBottom:10}}>⏳ Saisis — non trouvés dans UBS</div><div style={{background:'#fff',borderRadius:12,border:'0.5px solid var(--border)',overflow:'hidden'}}>{pend.map((e,i)=><div key={e.id} style={{display:'flex',justifyContent:'space-between',alignItems:isMobile?'stretch':'center',flexDirection:isMobile?'column':'row',padding:'12px 18px',borderBottom:i<pend.length-1?'0.5px solid var(--border)':'none',gap:12}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500}}>{e.merchant}</div><div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>{fd(e.date)}</div></div><Thumb url={e.receiptUrl} name={e.receiptName} onView={e.receiptUrl?()=>setViewer({url:e.receiptUrl,name:e.receiptName||'justificatif'}):null}/><span style={{fontFamily:'DM Mono',fontWeight:700,color:'var(--amber)',flexShrink:0,alignSelf:isMobile?'flex-start':'auto'}}>CHF {fmt(e.amountCHF||e.amount)}</span></div>)}</div></div>}<button onClick={()=>setShowUBS(true)} style={{...bS,marginTop:16}}>🔄 Importer un nouveau relevé UBS</button></>}</div>}
-
-        {tab==='stats'&&<StatsTab expenses={expenses} month={month} months={MONTHS}/>}
-      </div>
-
-      {showUBS&&<UBSModal onClose={()=>setShowUBS(false)} onImport={handleUBS}/>}
-      {showAdd&&<AddModal onClose={()=>setShowAdd(false)} onAdd={addExpense} month={month}/>}
-    </div>
-  );
-}
-
-ReactDOM.render(<React.StrictMode><App/></React.StrictMode>,document.getElementById('root'));
+}`;
+  try{
+    const res=await fetch(sourceUrl,{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    let html=await res.text();
+    html=html.replace(statsPlaceholder,statsReplacement);
+    html=html.replace("function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;","function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;\n  const formInputStyle=isMobile?{...inp,fontSize:16,padding:'12px 14px'}:inp;");
+    html=html.replace(/style=\{inp\}/g,"style={typeof formInputStyle!=='undefined'?formInputStyle:inp}");
+    html=html.replace('autoFocus/>','autoFocus={!isMobile}/>');
+    html=html.replace("padding:isMobile?18:24,width:'100%',maxWidth:isMobile?'100%':480,maxHeight:isMobile?'92dvh':'92vh'","padding:isMobile?16:24,width:'100%',maxWidth:isMobile?'100%':480,maxHeight:isMobile?'88dvh':'92vh'");
+    document.open();
+    document.write(html);
+    document.close();
+  }catch(err){
+    document.body.innerHTML='<div class="loader"><div style="font-size:28px">⚠</div><div class="msg">Impossible de charger NotesFrais</div><div class="msg" style="font-size:12px">'+String(err.message||err)+'</div></div>';
+  }
+})();
 </script>
 </body>
 </html>
