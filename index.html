@@ -19,10 +19,16 @@ body{font-family:system-ui,sans-serif;background:#F5F3EF;color:#1A1A1A;display:f
   const fixed = "        </div>}\n\n        {tab==='stats'&&<StatsTab expenses={expenses} month={month} months={MONTHS}/>}\n      </div>\n\n      {showUBS&&<UBSModal onClose={()=>setShowUBS(false)} onImport={handleUBS}/>}\n      {showAdd&&<AddModal onClose={()=>setShowAdd(false)} onAdd={addExpense} month={month}/>}\n    </div>";
   const oldDateDefault = "  // Default = today if in selected month, else 1st of month\n  const todayISO=new Date().toISOString().split('T')[0];\n  const defaultDate=todayISO.startsWith(month)?todayISO:`${month}-01`;";
   const newDateDefault = "  // Default to today's date whenever a new expense is added.\n  const todayISO=new Date().toISOString().split('T')[0];\n  const defaultDate=todayISO;";
-  const oldReconcileHelpers = "function pn(s){s=s.trim().replace(/'/g,'').replace(/\\s/g,'');if(!s||s==='-')return NaN;return parseFloat(s);}\n\n/* ── RECONCILIATION ── */";
-  const newReconcileHelpers = "function pn(s){s=s.trim().replace(/'/g,'').replace(/\\s/g,'');if(!s||s==='-')return NaN;return parseFloat(s);}\nfunction normLabel(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}\nfunction tokenizeLabel(s){return normLabel(s).split(' ').filter(t=>t.length>=3);}\nfunction labelsClose(a,b){const ta=tokenizeLabel(a),tb=tokenizeLabel(b);if(ta.length===0||tb.length===0)return false;const sa=new Set(ta),sb=new Set(tb);let common=0;for(const t of sa){if(sb.has(t))common++;}if(common>=2)return true;if(common===1){const strong=['uber','sbb','cff','ibis','restaurant','brasserie','netflix','coop','migros','amazon','easyjet','manor'];return [...sa].some(t=>sb.has(t)&&strong.includes(t));}const joinedA=ta.join(' '),joinedB=tb.join(' ');return joinedA.includes(joinedB)||joinedB.includes(joinedA);}\n\n/* ── RECONCILIATION ── */";
-  const oldReconcileMatch = "      if(dd<=2&&ap<=0.05){matched.add(i);return{...exp,status:'reconciled',ubsRow:r,amtDiff:Math.abs(ea-ra)>0.005?ra-ea:0};}";
-  const newReconcileMatch = "      if(dd<=2&&ap<=0.05&&labelsClose(exp.merchant,r.label)){matched.add(i);return{...exp,status:'reconciled',ubsRow:r,amtDiff:Math.abs(ea-ra)>0.005?ra-ea:0};}";
+  const oldHelpers = "function pn(s){s=s.trim().replace(/'/g,'').replace(/\\s/g,'');if(!s||s==='-')return NaN;return parseFloat(s);}\n\n/* ── RECONCILIATION ── */";
+  const newHelpers = "function pn(s){s=s.trim().replace(/'/g,'').replace(/\\s/g,'');if(!s||s==='-')return NaN;return parseFloat(s);}\nfunction normLabel(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}\nfunction tokenizeLabel(s){return normLabel(s).split(' ').filter(t=>t.length>=3);}\nfunction labelsClose(a,b){const ta=tokenizeLabel(a),tb=tokenizeLabel(b);if(ta.length===0||tb.length===0)return false;const sa=new Set(ta),sb=new Set(tb);let common=0;for(const t of sa){if(sb.has(t))common++;}if(common>=2)return true;if(common===1){const strong=['uber','sbb','cff','ibis','restaurant','brasserie','netflix','coop','migros','amazon','easyjet','manor'];return [...sa].some(t=>sb.has(t)&&strong.includes(t));}const joinedA=ta.join(' '),joinedB=tb.join(' ');return joinedA.includes(joinedB)||joinedB.includes(joinedA);}\n\n/* ── RECONCILIATION ── */";
+  const oldMatch = "      if(dd<=2&&ap<=0.05){matched.add(i);return{...exp,status:'reconciled',ubsRow:r,amtDiff:Math.abs(ea-ra)>0.005?ra-ea:0};}";
+  const newMatch = "      if(dd<=2&&ap<=0.05&&labelsClose(exp.merchant,r.label)){matched.add(i);return{...exp,status:'reconciled',ubsRow:r,amtDiff:Math.abs(ea-ra)>0.005?ra-ea:0};}";
+  const oldSkip = "    if(exp.status==='reconciled')return exp;\n";
+  const newSkip = "";
+  const oldReturn = "    return exp;";
+  const newReturn = "    return {...exp,status:'pending',ubsRow:null,amtDiff:0};";
+  const oldHandle = "    const mr=rows.filter(r=>r.date.startsWith(month));\n    const{expenses:rec,forgotten:forg}=reconcile(expenses,mr);\n    const toUp=rec.filter(r=>r.status==='reconciled'&&expenses.find(e=>e.id===r.id&&e.status!=='reconciled'));\n    await Promise.all(toUp.map(e=>updateStatus(e.id,'reconciled',e.ubsRow?.label||'',e.ubsRow?.date||null,e.amtDiff||0)));\n    setExpenses(rec);setForgotten(forg);setUbsLoaded(true);setSyncing(false);";
+  const newHandle = "    const mr=rows.filter(r=>r.date.startsWith(month));\n    const monthExpenses=expenses.filter(e=>e.date?.startsWith(month));\n    const otherExpenses=expenses.filter(e=>!e.date?.startsWith(month));\n    const resetMonthExpenses=monthExpenses.map(e=>({...e,status:'pending',ubsRow:null,amtDiff:0}));\n    const{expenses:recMonth,forgotten:forg}=reconcile(resetMonthExpenses,mr);\n    const changed=recMonth.filter(n=>{\n      const prev=monthExpenses.find(e=>e.id===n.id);\n      if(!prev)return false;\n      const prevLabel=prev.ubsRow?.label||'';\n      const nextLabel=n.ubsRow?.label||'';\n      const prevDate=prev.ubsRow?.date||null;\n      const nextDate=n.ubsRow?.date||null;\n      const prevDiff=Number(prev.amtDiff||0);\n      const nextDiff=Number(n.amtDiff||0);\n      return prev.status!==n.status||prevLabel!==nextLabel||prevDate!==nextDate||Math.abs(prevDiff-nextDiff)>0.005;\n    });\n    await Promise.all(changed.map(e=>updateStatus(e.id,e.status,e.ubsRow?.label||'',e.ubsRow?.date||null,e.amtDiff||0)));\n    const rec=[...otherExpenses,...recMonth].sort((a,b)=>new Date(b.date)-new Date(a.date));\n    setExpenses(rec);setForgotten(forg);setUbsLoaded(true);setSyncing(false);";
   try {
     const res = await fetch(sourceUrl, { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -30,8 +36,11 @@ body{font-family:system-ui,sans-serif;background:#F5F3EF;color:#1A1A1A;display:f
     if (!html.includes(broken)) throw new Error('Patch target not found');
     html = html.replace(broken, fixed);
     if (html.includes(oldDateDefault)) html = html.replace(oldDateDefault, newDateDefault);
-    if (html.includes(oldReconcileHelpers)) html = html.replace(oldReconcileHelpers, newReconcileHelpers);
-    if (html.includes(oldReconcileMatch)) html = html.replace(oldReconcileMatch, newReconcileMatch);
+    if (html.includes(oldHelpers)) html = html.replace(oldHelpers, newHelpers);
+    if (html.includes(oldMatch)) html = html.replace(oldMatch, newMatch);
+    if (html.includes(oldSkip)) html = html.replace(oldSkip, newSkip);
+    if (html.includes(oldReturn)) html = html.replace(oldReturn, newReturn);
+    if (html.includes(oldHandle)) html = html.replace(oldHandle, newHandle);
     document.open();
     document.write(html);
     document.close();
