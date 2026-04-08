@@ -162,8 +162,9 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
     html=html.replace(statsPlaceholder,statsReplacement);
     html=html.replace(periodBlockOld,periodBlockNew);
     html=html.replace(' capture="environment"','');
-    html=html.replace("function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;","function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;\n  const formInputStyle=isMobile?{...inp,fontSize:16,padding:'12px 14px'}:inp;");
+    html=html.replace("function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;","function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;\n  const formInputStyle=isMobile?{...inp,fontSize:16,padding:'12px 14px'}:inp;\n  const dateInputStyle={...(typeof formInputStyle!=='undefined'?formInputStyle:inp),WebkitAppearance:'none',appearance:'none',minHeight:isMobile?44:undefined};");
     html=html.replace(/style=\{inp\}/g,"style={typeof formInputStyle!=='undefined'?formInputStyle:inp}");
+    html=html.replace('type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}','type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} style={dateInputStyle}');
     html=html.replace('autoFocus/>','autoFocus={!isMobile}/>');
     html=html.replace("padding:isMobile?18:24,width:'100%',maxWidth:isMobile?'100%':480,maxHeight:isMobile?'92dvh':'92vh'","padding:isMobile?16:24,width:'100%',maxWidth:isMobile?'100%':480,maxHeight:isMobile?'88dvh':'92vh'");
     document.open();
