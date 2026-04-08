@@ -19,15 +19,19 @@ body{font-family:system-ui,sans-serif;background:#F5F3EF;color:#1A1A1A;display:f
   const fixed = "        </div>}\n\n        {tab==='stats'&&<StatsTab expenses={expenses} month={month} months={MONTHS}/>}\n      </div>\n\n      {showUBS&&<UBSModal onClose={()=>setShowUBS(false)} onImport={handleUBS}/>}\n      {showAdd&&<AddModal onClose={()=>setShowAdd(false)} onAdd={addExpense} month={month}/>}\n    </div>";
   const oldDateDefault = "  // Default = today if in selected month, else 1st of month\n  const todayISO=new Date().toISOString().split('T')[0];\n  const defaultDate=todayISO.startsWith(month)?todayISO:`${month}-01`;";
   const newDateDefault = "  // Default to today's date whenever a new expense is added.\n  const todayISO=new Date().toISOString().split('T')[0];\n  const defaultDate=todayISO;";
+  const oldReconcileHelpers = "function pn(s){s=s.trim().replace(/'/g,'').replace(/\\s/g,'');if(!s||s==='-')return NaN;return parseFloat(s);}\n\n/* ── RECONCILIATION ── */";
+  const newReconcileHelpers = "function pn(s){s=s.trim().replace(/'/g,'').replace(/\\s/g,'');if(!s||s==='-')return NaN;return parseFloat(s);}\nfunction normLabel(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}\nfunction tokenizeLabel(s){return normLabel(s).split(' ').filter(t=>t.length>=3);}\nfunction labelsClose(a,b){const ta=tokenizeLabel(a),tb=tokenizeLabel(b);if(ta.length===0||tb.length===0)return false;const sa=new Set(ta),sb=new Set(tb);let common=0;for(const t of sa){if(sb.has(t))common++;}if(common>=2)return true;if(common===1){const strong=['uber','sbb','cff','ibis','restaurant','brasserie','netflix','coop','migros','amazon','easyjet','manor'];return [...sa].some(t=>sb.has(t)&&strong.includes(t));}const joinedA=ta.join(' '),joinedB=tb.join(' ');return joinedA.includes(joinedB)||joinedB.includes(joinedA);}\n\n/* ── RECONCILIATION ── */";
+  const oldReconcileMatch = "      if(dd<=2&&ap<=0.05){matched.add(i);return{...exp,status:'reconciled',ubsRow:r,amtDiff:Math.abs(ea-ra)>0.005?ra-ea:0};}";
+  const newReconcileMatch = "      if(dd<=2&&ap<=0.05&&labelsClose(exp.merchant,r.label)){matched.add(i);return{...exp,status:'reconciled',ubsRow:r,amtDiff:Math.abs(ea-ra)>0.005?ra-ea:0};}";
   try {
     const res = await fetch(sourceUrl, { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     let html = await res.text();
     if (!html.includes(broken)) throw new Error('Patch target not found');
     html = html.replace(broken, fixed);
-    if (html.includes(oldDateDefault)) {
-      html = html.replace(oldDateDefault, newDateDefault);
-    }
+    if (html.includes(oldDateDefault)) html = html.replace(oldDateDefault, newDateDefault);
+    if (html.includes(oldReconcileHelpers)) html = html.replace(oldReconcileHelpers, newReconcileHelpers);
+    if (html.includes(oldReconcileMatch)) html = html.replace(oldReconcileMatch, newReconcileMatch);
     document.open();
     document.write(html);
     document.close();
