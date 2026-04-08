@@ -20,7 +20,7 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 </div>
 <script>
 (async function(){
-  const sourceUrl='https://raw.githubusercontent.com/NumeriqAG/notesfrais/main/index.html';
+  const sourceUrl='https://raw.githubusercontent.com/NumeriqAG/notesfrais/main/app.html';
   const statsPlaceholder="function StatsTab({expenses,month,months}){return <div style={{maxWidth:900}}><h1 style={{fontSize:22,fontWeight:700,marginBottom:12}}>Statistiques</h1><div style={{fontSize:13,color:'var(--t3)'}}>Vue détaillée à venir</div></div>;}";
   const statsReplacement=String.raw`function StatsTab({expenses,month,months}){
   const isMobile=typeof window!=='undefined'&&window.innerWidth<860;
