@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -14,15 +14,20 @@ body{font-family:system-ui,sans-serif;background:#F5F3EF;color:#1A1A1A;display:f
 <div id="status">Chargement de NotesFrais…</div>
 <script>
 (async function () {
-  const sourceUrl = 'https://raw.githubusercontent.com/NumeriqAG/notesfrais/cf852cc876acf78c8926325c60aa54f87ee25039/index.html';
+  const sourceUrl = 'https://raw.githubusercontent.com/NumeriqAG/notesfrais/main/app.html';
   const broken = "        </div>}\n      </div>\n\n        {tab==='stats'&&<StatsTab expenses={expenses} month={month} months={MONTHS}/>}\n      </div>\n\n      {showUBS&&<UBSModal onClose={()=>setShowUBS(false)} onImport={handleUBS}/>}\n      {showAdd&&<AddModal onClose={()=>setShowAdd(false)} onAdd={addExpense} month={month}/>}\n    </div>";
   const fixed = "        </div>}\n\n        {tab==='stats'&&<StatsTab expenses={expenses} month={month} months={MONTHS}/>}\n      </div>\n\n      {showUBS&&<UBSModal onClose={()=>setShowUBS(false)} onImport={handleUBS}/>}\n      {showAdd&&<AddModal onClose={()=>setShowAdd(false)} onAdd={addExpense} month={month}/>}\n    </div>";
+  const oldDateDefault = "  // Default = today if in selected month, else 1st of month\n  const todayISO=new Date().toISOString().split('T')[0];\n  const defaultDate=todayISO.startsWith(month)?todayISO:`${month}-01`;";
+  const newDateDefault = "  // Default to today's date whenever a new expense is added.\n  const todayISO=new Date().toISOString().split('T')[0];\n  const defaultDate=todayISO;";
   try {
     const res = await fetch(sourceUrl, { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     let html = await res.text();
     if (!html.includes(broken)) throw new Error('Patch target not found');
     html = html.replace(broken, fixed);
+    if (html.includes(oldDateDefault)) {
+      html = html.replace(oldDateDefault, newDateDefault);
+    }
     document.open();
     document.write(html);
     document.close();
