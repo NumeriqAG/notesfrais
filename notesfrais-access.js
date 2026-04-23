@@ -47,7 +47,7 @@ function AccessGate({children}){
   }
   return <>
     {children}
-    <button onClick={logout} title="Changer d'accès" style={{position:'fixed',right:12,bottom:12,zIndex:2600,border:'0.5px solid var(--border)',background:'#fff',color:'var(--t2)',borderRadius:999,padding:'8px 11px',fontSize:11,boxShadow:'0 8px 22px rgba(26,26,26,0.12)',cursor:'pointer'}}>{role==='finance'?'Finance':'Mike'} · sortir</button>
+    {role==='finance'&&<button onClick={logout} title="Changer d'accès" style={{position:'fixed',top:12,right:12,zIndex:2600,border:'0.5px solid rgba(26,26,26,0.08)',background:'rgba(255,255,255,0.92)',backdropFilter:'blur(10px)',color:'var(--t2)',borderRadius:999,padding:'7px 10px',fontSize:11,boxShadow:'0 8px 22px rgba(26,26,26,0.08)',cursor:'pointer'}}>Finance</button>}
   </>;
 }
 `;
