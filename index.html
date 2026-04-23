@@ -17,11 +17,57 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 <div class="loader"><div class="dot"></div><div class="msg">Chargement de NotesFrais...</div></div>
 <script>
 (async function(){
+  const statsScript = String.raw`function StatsTab({expenses,month,months}){
+  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;
+  const monthExpenses=expenses.filter(e=>e.date&&e.date.startsWith(month));
+  const total=monthExpenses.reduce((s,e)=>s+Number(e.amountCHF||e.amount||0),0);
+  const tva=monthExpenses.reduce((s,e)=>s+Number(e.tva||0),0);
+  const reconciled=monthExpenses.filter(e=>e.status==='reconciled').length;
+  const bycat=CATS.map(c=>({
+    ...c,
+    total:monthExpenses.filter(e=>e.category===c.id).reduce((s,e)=>s+Number(e.amountCHF||e.amount||0),0),
+    count:monthExpenses.filter(e=>e.category===c.id).length,
+  })).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
+  const merchants={};
+  monthExpenses.forEach(e=>{const key=e.merchant||'Inconnu';merchants[key]=(merchants[key]||0)+Number(e.amountCHF||e.amount||0);});
+  const topMerchants=Object.entries(merchants).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const trend=months.map(m=>{const items=expenses.filter(e=>e.date&&e.date.startsWith(m.v));return{label:m.l,total:items.reduce((s,e)=>s+Number(e.amountCHF||e.amount||0),0),count:items.length};});
+  return(
+    <div style={{maxWidth:860}}>
+      <div style={{marginBottom:24}}><h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Statistiques</h1><div style={{fontSize:13,color:'var(--t3)'}}>Vue synthetique du mois</div></div>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(4,1fr)',gap:12,marginBottom:20}}>
+        {[
+          {label:'Total',value:'CHF '+fmt(total),sub:monthExpenses.length+' frais'},
+          {label:'TVA',value:'CHF '+fmt(tva),sub:'recuperable'},
+          {label:'Reconcilies',value:reconciled+'/'+monthExpenses.length,sub:(monthExpenses.length?Math.round(reconciled/monthExpenses.length*100):0)+'%'},
+          {label:'Panier moyen',value:'CHF '+fmt(monthExpenses.length?total/monthExpenses.length:0),sub:'par depense'},
+        ].map(card=><div key={card.label} style={{background:'#fff',borderRadius:12,padding:'16px 18px',border:'0.5px solid var(--border)'}}><div style={{fontSize:10,color:'var(--t3)',marginBottom:6,letterSpacing:'0.04em'}}>{card.label.toUpperCase()}</div><div style={{fontSize:18,fontWeight:700,fontFamily:'DM Mono'}}>{card.value}</div><div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{card.sub}</div></div>)}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1.1fr 0.9fr',gap:16,marginBottom:16}}>
+        <div style={{background:'#fff',borderRadius:14,padding:20,border:'0.5px solid var(--border)'}}>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Repartition par categorie</div>
+          {bycat.length===0&&<div style={{fontSize:13,color:'var(--t3)'}}>Aucune depense sur cette periode.</div>}
+          {bycat.map(cat=>{const pct=total?Math.round(cat.total/total*100):0;return <div key={cat.id} style={{marginBottom:12}}><div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:5,alignItems:'center'}}><span style={{fontWeight:500}}>{cat.icon+' '+cat.label+' · '+cat.count+' frais'}</span><span style={{fontFamily:'DM Mono',fontWeight:600,whiteSpace:'nowrap'}}>CHF {fmt(cat.total)} <span style={{color:'var(--t3)',fontWeight:400,fontSize:11}}>({pct}%)</span></span></div><div style={{height:6,background:'var(--s2)',borderRadius:99}}><div style={{width:pct+'%',height:'100%',background:'var(--accent)',borderRadius:99}}></div></div></div>;})}
+        </div>
+        <div style={{background:'#fff',borderRadius:14,padding:20,border:'0.5px solid var(--border)'}}>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Top commercants</div>
+          {topMerchants.length===0&&<div style={{fontSize:13,color:'var(--t3)'}}>Aucune depense sur cette periode.</div>}
+          {topMerchants.map(([merchant,amount],idx)=>{const pct=total?Math.round(amount/total*100):0;return <div key={merchant} style={{marginBottom:12}}><div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:5,alignItems:'center'}}><span style={{fontWeight:idx===0?600:500}}>{merchant}</span><span style={{fontFamily:'DM Mono',fontWeight:600,whiteSpace:'nowrap'}}>CHF {fmt(amount)}</span></div><div style={{height:5,background:'var(--s2)',borderRadius:99}}><div style={{width:pct+'%',height:'100%',background:idx===0?'#1A3FB5':'#7EA5FF',borderRadius:99}}></div></div></div>;})}
+        </div>
+      </div>
+      <div style={{background:'#fff',borderRadius:14,padding:20,border:'0.5px solid var(--border)'}}>
+        <div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Tendance par mois</div>
+        <div style={{display:'grid',gap:8}}>{trend.map(item=>{const max=Math.max(...trend.map(t=>t.total),1);const pct=Math.round(item.total/max*100);return <div key={item.label}><div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:4,alignItems:'center'}}><span style={{color:'var(--t2)'}}>{item.label}</span><span style={{fontFamily:'DM Mono',fontWeight:600,whiteSpace:'nowrap'}}>CHF {fmt(item.total)} <span style={{color:'var(--t3)',fontWeight:400,fontSize:11}}>({item.count} frais)</span></span></div><div style={{height:6,background:'var(--s2)',borderRadius:99}}><div style={{width:pct+'%',height:'100%',background:'#0F6E56',borderRadius:99}}></div></div></div>;})}</div>
+      </div>
+    </div>
+  );
+}`;
   const logoScript = `<script>(function(){function inject(){if(document.getElementById('numeriq-brand-card'))return true;const title=[...document.querySelectorAll('div')].find(el=>el.textContent&&el.textContent.trim()==='NOTES DE FRAIS');if(!title||!title.parentElement)return false;const container=title.parentElement;const mike=[...container.children].find(el=>el.textContent&&el.textContent.trim()==='Mike');if(!mike)return false;const mobile=window.innerWidth<860;const card=document.createElement('div');card.id='numeriq-brand-card';card.style.cssText='background:linear-gradient(135deg,#0B1F4D 0%,#143B8C 58%,#1E56C9 100%);border-radius:18px;padding:'+(mobile?'18px 14px 14px':'20px 16px 15px')+';box-shadow:0 14px 34px rgba(21,58,138,.18);margin-bottom:12px;overflow:hidden';card.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:'+(mobile?10:12)+'px;min-height:'+(mobile?118:132)+'px;text-align:center"><div style="font-size:'+(mobile?13:14)+'px;font-weight:700;letter-spacing:.34em;color:#9EC5FF;text-indent:.34em">NUMERIQ</div><div style="font-size:'+(mobile?26:30)+'px;font-weight:800;letter-spacing:.18em;color:#FFF;text-indent:.18em;line-height:1">PAYROLL</div><div style="width:'+(mobile?72:84)+'px;height:2px;background:rgba(255,255,255,.22);border-radius:999px"></div><div style="font-size:11px;color:rgba(255,255,255,.72);letter-spacing:.18em;text-indent:.18em">NUMERIQ AG</div></div>';container.insertBefore(card,mike);return true;}const t=setInterval(()=>{if(inject())clearInterval(t)},250);window.addEventListener('load',inject);setTimeout(()=>clearInterval(t),8000);})();<\/script>`;
   try{
     const res=await fetch('app.html',{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     let html=await res.text();
+    html=html.replace(/function StatsTab\(\{expenses,month,months\}\)\{return[\s\S]*?Vue d[^<]*<\/div><\/div>;\}/,statsScript);
     html=html.replace(' capture="environment"','');
     html=html.replace("function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;","function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;\n  const formInputStyle=isMobile?{...inp,fontSize:16,padding:'12px 14px'}:inp;\n  const dateInputStyle={...formInputStyle,WebkitAppearance:'none',appearance:'none',minHeight:isMobile?44:undefined};");
     html=html.replace(/style=\{inp\}/g,"style={typeof formInputStyle!=='undefined'?formInputStyle:inp}");
