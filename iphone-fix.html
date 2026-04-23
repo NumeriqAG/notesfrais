@@ -10,10 +10,12 @@
     const appRes=await fetch('app.html',{cache:'no-store'});
     if(!appRes.ok)throw new Error('HTTP app '+appRes.status);
     let html=await appRes.text();
-    const patchRes=await fetch('notesfrais-patches.js',{cache:'no-store'});
-    if(!patchRes.ok)throw new Error('HTTP patch '+patchRes.status);
-    const patchCode=await patchRes.text();
-    new Function(patchCode)();
+    const patchFiles=['notesfrais-patches.js','notesfrais-submit-summary.js'];
+    for(const file of patchFiles){
+      const patchRes=await fetch(file,{cache:'no-store'});
+      if(!patchRes.ok)throw new Error('HTTP patch '+patchRes.status);
+      new Function(await patchRes.text())();
+    }
     if(window.patchNotesFrais)html=window.patchNotesFrais(html);
     document.open();document.write(html);document.close();
   }catch(err){
