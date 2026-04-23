@@ -50,7 +50,7 @@ function nr(r){const receiptPath=extractReceiptPath(r.receipt_url||null);return{
         setLoading(true);setError('');
         const signedUrl=await getSignedReceiptUrl(path,false,name);
         if(live)setUrl(signedUrl);
-      }catch(e){if(live)setError('Impossible d\'ouvrir le justificatif.');}
+      }catch(e){if(live)setError('Impossible d\\'ouvrir le justificatif.');}
       finally{if(live)setLoading(false);}
     };
     load();
@@ -69,7 +69,7 @@ function nr(r){const receiptPath=extractReceiptPath(r.receipt_url||null);return{
     try{
       const openUrl=url||await getSignedReceiptUrl(path,false,name);
       window.open(openUrl,'_blank','noopener,noreferrer');
-    }catch(e){setError('Impossible d\'ouvrir le justificatif.');}
+    }catch(e){setError('Impossible d\\'ouvrir le justificatif.');}
   };
   return(
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:3000,padding:isMobile?10:20}}>
@@ -119,20 +119,14 @@ function Thumb({path,name,onView}){
       if(file){const u=await uploadReceipt(file);receiptPath=u.path;receiptName=u.name;}
       await onAdd({...form,currency:'CHF',amountCHF:parseFloat(form.amount),amount:parseFloat(form.amount),tva:parseFloat(form.tva)||0,status:'pending',receiptPath,receiptName});`);
 
-    html=html.replace(`{viewer&&<ReceiptViewer url={viewer.url} name={viewer.name} onClose={()=>setViewer(null)}/>}','{viewer&&<ReceiptViewer path={viewer.path} name={viewer.name} onClose={()=>setViewer(null)}/>}');
-    html=html.replace(/fil\.filter\(e=>e\.receiptUrl\)\.length/g,`);
-
-    html=html.replace(`{viewer&&<ReceiptViewer url={viewer.url} name={viewer.name} onClose={()=>setViewer(null)}/>}','{viewer&&<ReceiptViewer path={viewer.path} name={viewer.name} onClose={()=>setViewer(null)}/>}');
-
+    html=html.replace(`{viewer&&<ReceiptViewer url={viewer.url} name={viewer.name} onClose={()=>setViewer(null)}/>`, `{viewer&&<ReceiptViewer path={viewer.path} name={viewer.name} onClose={()=>setViewer(null)}/>');
     html=html.replace(/fil\.filter\(e=>e\.receiptUrl\)\.length/g, `fil.filter(e=>e.receiptPath||e.receiptUrl).length`);
-    html=html.replace(/const deleteExpense=useCallback\(async\(id,receiptUrl\)=>\{try\{await deleteById\(id,receiptUrl\);/g, `const deleteExpense=useCallback(async(id,receiptPath)=>{try{await deleteById(id,receiptPath);`);
+    html=html.replace(`const deleteExpense=useCallback(async(id,receiptUrl)=>{try{await deleteById(id,receiptUrl);`, `const deleteExpense=useCallback(async(id,receiptPath)=>{try{await deleteById(id,receiptPath);`);
     html=html.replace(/url=\{e\.receiptUrl\}/g, `path={e.receiptPath||e.receiptUrl}`);
-    html=html.replace(/onView=\{e\.receiptUrl\?\(\)=>setViewer\(\{url:e\.receiptUrl,name:e\.receiptName\|\|'justificatif'\}\):null\}/g, `onView={(e.receiptPath||e.receiptUrl)?()=>setViewer({path:e.receiptPath||e.receiptUrl,name:e.receiptName||'justificatif'}):null}`);
-    html=html.replace(/onView=\{e\.receiptUrl\?\(\)=>setViewer\(\{url:e\.receiptUrl,name:e\.receiptName\|\|'justificatif'\}\):null\}/g, `onView={(e.receiptPath||e.receiptUrl)?()=>setViewer({path:e.receiptPath||e.receiptUrl,name:e.receiptName||'justificatif'}):null}`);
     html=html.replace(/onView=\{e\.receiptUrl\?\(\)=>setViewer\(\{url:e\.receiptUrl,name:e\.receiptName\|\|'justificatif'\}\):null\}/g, `onView={(e.receiptPath||e.receiptUrl)?()=>setViewer({path:e.receiptPath||e.receiptUrl,name:e.receiptName||'justificatif'}):null}`);
     html=html.replace(/\{e\.receiptUrl&&<a href=\{e\.receiptUrl\} download=\{e\.receiptName\|\|'justificatif'\} title="Télécharger le justificatif" style=\{\{color:'var\(--accent\)',fontSize:15,textDecoration:'none',padding:2,lineHeight:1\}\} onClick=\{ev=>ev\.stopPropagation\(\)\}>⬇<\/a>\}/g, `{(e.receiptPath||e.receiptUrl)&&<button onClick={()=>setViewer({path:e.receiptPath||e.receiptUrl,name:e.receiptName||'justificatif'})} title="Voir le justificatif" style={{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontSize:15,padding:2,lineHeight:1}}>👁</button>}`);
     html=html.replace(/deleteExpense\(e\.id,e\.receiptUrl\)/g, `deleteExpense(e.id,e.receiptPath||e.receiptUrl)`);
-    html=html.replace(`{viewer&&<ReceiptViewer url={viewer.url} name={viewer.name} onClose={()=>setViewer(null)}/>`, `{viewer&&<ReceiptViewer path={viewer.path} name={viewer.name} onClose={()=>setViewer(null)}/>`);
+    html=html.replace(`{viewer&&<ReceiptViewer path={viewer.path} name={viewer.name} onClose={()=>setViewer(null)}/>'`, `{viewer&&<ReceiptViewer path={viewer.path} name={viewer.name} onClose={()=>setViewer(null)}/>');
     return html;
   };
 })();
