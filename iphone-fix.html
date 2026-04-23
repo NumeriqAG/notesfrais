@@ -14,167 +14,23 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 </style>
 </head>
 <body>
-<div class="loader">
-  <div class="dot"></div>
-  <div class="msg">Chargement de NotesFraisâ€¦</div>
-</div>
+<div class="loader"><div class="dot"></div><div class="msg">Chargement de NotesFrais...</div></div>
 <script>
 (async function(){
-  const sourceUrl='app.html';
-  const logoUrl='https://raw.githubusercontent.com/NumeriqAG/notesfrais/main/logo-numeriq-payroll.png';
-  const statsPlaceholder="function StatsTab({expenses,month,months}){return <div style={{maxWidth:900}}><h1 style={{fontSize:22,fontWeight:700,marginBottom:12}}>Statistiques</h1><div style={{fontSize:13,color:'var(--t3)'}}>Vue dÃ©taillÃ©e Ã  venir</div></div>;";
-  const statsReplacement=String.raw`function StatsTab({expenses,month,months}){
-  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;
-  const monthExpenses=expenses.filter(e=>e.date&&e.date.startsWith(month));
-  const total=monthExpenses.reduce((s,e)=>s+Number(e.amountCHF||e.amount||0),0);
-  const tva=monthExpenses.reduce((s,e)=>s+Number(e.tva||0),0);
-  const reconciled=monthExpenses.filter(e=>e.status==='reconciled').length;
-  const bycat=CATS.map(c=>({
-    ...c,
-    total:monthExpenses.filter(e=>e.category===c.id).reduce((s,e)=>s+Number(e.amountCHF||e.amount||0),0),
-    count:monthExpenses.filter(e=>e.category===c.id).length,
-  })).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
-  const merchants={};
-  monthExpenses.forEach(e=>{
-    const key=e.merchant||'Inconnu';
-    merchants[key]=(merchants[key]||0)+Number(e.amountCHF||e.amount||0);
-  });
-  const topMerchants=Object.entries(merchants).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const trend=months.map(m=>{
-    const items=expenses.filter(e=>e.date&&e.date.startsWith(m.v));
-    return {
-      label:m.l,
-      total:items.reduce((s,e)=>s+Number(e.amountCHF||e.amount||0),0),
-      count:items.length,
-    };
-  });
-  return(
-    <div style={{maxWidth:860}}>
-      <div style={{marginBottom:24}}>
-        <h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Statistiques</h1>
-        <div style={{fontSize:13,color:'var(--t3)'}}>Vue synthÃ©tique du mois</div>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(4,1fr)',gap:12,marginBottom:20}}>
-        {[
-          {label:'Total',value:'CHF '+fmt(total),sub:monthExpenses.length+' frais'},
-          {label:'TVA',value:'CHF '+fmt(tva),sub:'rÃ©cupÃ©rable'},
-          {label:'RÃ©conciliÃ©s',value:reconciled+'/'+monthExpenses.length,sub:(monthExpenses.length?Math.round(reconciled/monthExpenses.length*100):0)+'%'},
-          {label:'Panier moyen',value:'CHF '+fmt(monthExpenses.length?total/monthExpenses.length:0),sub:'par dÃ©pense'},
-        ].map(card=>(
-          <div key={card.label} style={{background:'#fff',borderRadius:12,padding:'16px 18px',border:'0.5px solid var(--border)'}}>
-            <div style={{fontSize:10,color:'var(--t3)',marginBottom:6,letterSpacing:'0.04em'}}>{card.label.toUpperCase()}</div>
-            <div style={{fontSize:18,fontWeight:700,fontFamily:'DM Mono'}}>{card.value}</div>
-            <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{card.sub}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1.1fr 0.9fr',gap:16,marginBottom:16}}>
-        <div style={{background:'#fff',borderRadius:14,padding:20,border:'0.5px solid var(--border)'}}>
-          <div style={{fontSize:13,fontWeight:600,marginBottom:14}}>RÃ©partition par catÃ©gorie</div>
-          {bycat.length===0&&<div style={{fontSize:13,color:'var(--t3)'}}>Aucune dÃ©pense sur cette pÃ©riode.</div>}
-          {bycat.map(cat=>{
-            const pct=total?Math.round(cat.total/total*100):0;
-            return(
-              <div key={cat.id} style={{marginBottom:12}}>
-                <div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:5,alignItems:'center'}}>
-                  <span style={{fontWeight:500}}>{cat.icon+' '+cat.label+' Â· '+cat.count+' frais'}</span>
-                  <span style={{fontFamily:'DM Mono',fontWeight:600,whiteSpace:'nowrap'}}>CHF {fmt(cat.total)} <span style={{color:'var(--t3)',fontWeight:400,fontSize:11}}>({pct}%)</span></span>
-                </div>
-                <div style={{height:6,background:'var(--s2)',borderRadius:99}}>
-                  <div style={{width:pct+'%',height:'100%',background:'var(--accent)',borderRadius:99}}></div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div style={{background:'#fff',borderRadius:14,padding:20,border:'0.5px solid var(--border)'}}>
-          <div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Top commerÃ§ants</div>
-          {topMerchants.length===0&&<div style={{fontSize:13,color:'var(--t3)'}}>Aucune dÃ©pense sur cette pÃ©riode.</div>}
-          {topMerchants.map(([merchant,amount],idx)=>{
-            const pct=total?Math.round(amount/total*100):0;
-            return(
-              <div key={merchant} style={{marginBottom:12}}>
-                <div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:5,alignItems:'center'}}>
-                  <span style={{fontWeight:idx===0?600:500}}>{merchant}</span>
-                  <span style={{fontFamily:'DM Mono',fontWeight:600,whiteSpace:'nowrap'}}>CHF {fmt(amount)}</span>
-                </div>
-                <div style={{height:5,background:'var(--s2)',borderRadius:99}}>
-                  <div style={{width:pct+'%',height:'100%',background:idx===0?'#1A3FB5':'#7EA5FF',borderRadius:99}}></div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div style={{background:'#fff',borderRadius:14,padding:20,border:'0.5px solid var(--border)'}}>
-        <div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Tendance par mois</div>
-        <div style={{display:'grid',gap:8}}>
-          {trend.map(item=>{
-            const max=Math.max(...trend.map(t=>t.total),1);
-            const pct=Math.round(item.total/max*100);
-            return(
-              <div key={item.label}>
-                <div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:4,alignItems:'center'}}>
-                  <span style={{color:'var(--t2)'}}>{item.label}</span>
-                  <span style={{fontFamily:'DM Mono',fontWeight:600,whiteSpace:'nowrap'}}>CHF {fmt(item.total)} <span style={{color:'var(--t3)',fontWeight:400,fontSize:11}}>({item.count} frais)</span></span>
-                </div>
-                <div style={{height:6,background:'var(--s2)',borderRadius:99}}>
-                  <div style={{width:pct+'%',height:'100%',background:'#0F6E56',borderRadius:99}}></div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}`;
-  const periodBlockOld=String.raw`<div style={{padding:isMobile?'0 12px 10px':'0 12px 12px'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.08em',padding:'0 8px',marginBottom:6}}>PÃ‰RIODE</div><div style={{display:'flex',flexDirection:isMobile?'row':'column',gap:isMobile?8:0,overflowX:isMobile?'auto':'visible',paddingBottom:isMobile?4:0,WebkitOverflowScrolling:'touch'}}>{MONTHS.map(m=><button key={m.v} onClick={()=>setMonth(m.v)} style={{width:isMobile?'auto':'100%',minWidth:isMobile?132:'auto',textAlign:'left',padding:'7px 12px',borderRadius:8,border:'none',background:month===m.v?'var(--al)':'none',color:month===m.v?'var(--accent)':'var(--t2)',fontSize:13,fontWeight:month===m.v?500:400,cursor:'pointer',marginBottom:isMobile?0:2,display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexShrink:0}}><span>{m.l}</span>{monthCounts[m.v]>0&&<span style={{minWidth:20,height:20,padding:'0 6px',borderRadius:999,background:month===m.v?'rgba(26,63,181,0.12)':'var(--s2)',color:month===m.v?'var(--accent)':'var(--t3)',fontSize:11,fontWeight:600,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{monthCounts[m.v]}</span>}</button>)}</div></div>`;
-  const periodBlockNew=String.raw`<div style={{padding:isMobile?'0 12px 10px':'0 12px 12px'}}>
-          <div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.08em',padding:'0 8px',marginBottom:6}}>PÃ‰RIODE</div>
-          {isMobile
-            ?<div style={{padding:'0 4px'}}>
-              <select
-                value={month}
-                onChange={e=>setMonth(e.target.value)}
-                style={{...inp,fontSize:16,padding:'12px 14px',background:'#fff'}}
-              >
-                {MONTHS.map(m=>(
-                  <option key={m.v} value={m.v}>
-                    {monthCounts[m.v]>0?m.l+' ('+monthCounts[m.v]+')':m.l}
-                  </option>
-                ))}
-              </select>
-            </div>
-            :<div style={{display:'flex',flexDirection:'column',gap:0}}>
-              {MONTHS.map(m=>(
-                <button key={m.v} onClick={()=>setMonth(m.v)} style={{width:'100%',textAlign:'left',padding:'7px 12px',borderRadius:8,border:'none',background:month===m.v?'var(--al)':'none',color:month===m.v?'var(--accent)':'var(--t2)',fontSize:13,fontWeight:month===m.v?500:400,cursor:'pointer',marginBottom:2,display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-                  <span>{m.l}</span>
-                  {monthCounts[m.v]>0&&<span style={{minWidth:20,height:20,padding:'0 6px',borderRadius:999,background:month===m.v?'rgba(26,63,181,0.12)':'var(--s2)',color:month===m.v?'var(--accent)':'var(--t3)',fontSize:11,fontWeight:600,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{monthCounts[m.v]}</span>}
-                </button>
-              ))}
-            </div>
-          }
-        </div>`;
-  const logoInjectionScript = `<script>(function(){const embeddedLogo='data:image/png;base64,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';function inject(){if(document.getElementById('numeriq-brand-card')) return true;const labels=[...document.querySelectorAll('div')];const title=labels.find(el=>el.textContent&&el.textContent.trim()==='NOTES DE FRAIS');if(!title||!title.parentElement) return false;const container=title.parentElement;const mike=[...container.children].find(el=>el.textContent&&el.textContent.trim()==='Mike');if(!mike) return false;const mobile=window.innerWidth<860;const card=document.createElement('div');card.id='numeriq-brand-card';card.style.background='linear-gradient(135deg,#0B1F4D 0%,#143B8C 58%,#1E56C9 100%)';card.style.borderRadius='18px';card.style.padding=mobile?'16px 12px':'18px 14px';card.style.boxShadow='0 14px 34px rgba(21,58,138,0.18)';card.style.marginBottom='12px';card.style.overflow='hidden';card.innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:'+(mobile?110:132)+'px"><img src="'+embeddedLogo+'" alt="Numeriq Payroll" style="display:block;width:100%;max-width:'+(mobile?170:190)+'px;max-height:'+(mobile?92:108)+'px;height:auto;object-fit:contain;object-position:center center"></div>';container.insertBefore(card,mike);return true;}const timer=setInterval(()=>{if(inject()) clearInterval(timer);},250);window.addEventListener('load',inject);setTimeout(()=>clearInterval(timer),8000);})();<\/script>`;
+  const logoScript = `<script>(function(){function inject(){if(document.getElementById('numeriq-brand-card'))return true;const title=[...document.querySelectorAll('div')].find(el=>el.textContent&&el.textContent.trim()==='NOTES DE FRAIS');if(!title||!title.parentElement)return false;const container=title.parentElement;const mike=[...container.children].find(el=>el.textContent&&el.textContent.trim()==='Mike');if(!mike)return false;const mobile=window.innerWidth<860;const card=document.createElement('div');card.id='numeriq-brand-card';card.style.cssText='background:linear-gradient(135deg,#0B1F4D 0%,#143B8C 58%,#1E56C9 100%);border-radius:18px;padding:'+(mobile?'18px 14px 14px':'20px 16px 15px')+';box-shadow:0 14px 34px rgba(21,58,138,.18);margin-bottom:12px;overflow:hidden';card.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:'+(mobile?10:12)+'px;min-height:'+(mobile?118:132)+'px;text-align:center"><div style="font-size:'+(mobile?13:14)+'px;font-weight:700;letter-spacing:.34em;color:#9EC5FF;text-indent:.34em">NUMERIQ</div><div style="font-size:'+(mobile?26:30)+'px;font-weight:800;letter-spacing:.18em;color:#FFF;text-indent:.18em;line-height:1">PAYROLL</div><div style="width:'+(mobile?72:84)+'px;height:2px;background:rgba(255,255,255,.22);border-radius:999px"></div><div style="font-size:11px;color:rgba(255,255,255,.72);letter-spacing:.18em;text-indent:.18em">NUMERIQ AG</div></div>';container.insertBefore(card,mike);return true;}const t=setInterval(()=>{if(inject())clearInterval(t)},250);window.addEventListener('load',inject);setTimeout(()=>clearInterval(t),8000);})();<\/script>`;
   try{
-    const res=await fetch(sourceUrl,{cache:'no-store'});
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    const res=await fetch('app.html',{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
     let html=await res.text();
-    html=html.replace(statsPlaceholder,statsReplacement);
-    html=html.replace(periodBlockOld,periodBlockNew);
     html=html.replace(' capture="environment"','');
-    html=html.replace("function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;","function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;\n  const formInputStyle=isMobile?{...inp,fontSize:16,padding:'12px 14px'}:inp;\n  const dateInputStyle={...(typeof formInputStyle!=='undefined'?formInputStyle:inp),WebkitAppearance:'none',appearance:'none',minHeight:isMobile?44:undefined};");
+    html=html.replace("function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;","function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;\n  const formInputStyle=isMobile?{...inp,fontSize:16,padding:'12px 14px'}:inp;\n  const dateInputStyle={...formInputStyle,WebkitAppearance:'none',appearance:'none',minHeight:isMobile?44:undefined};");
     html=html.replace(/style=\{inp\}/g,"style={typeof formInputStyle!=='undefined'?formInputStyle:inp}");
     html=html.replace('type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}','type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} style={dateInputStyle}');
     html=html.replace('autoFocus/>','autoFocus={!isMobile}/>');
-    html=html.replace("padding:isMobile?18:24,width:'100%',maxWidth:isMobile?'100%':480,maxHeight:isMobile?'92dvh':'92vh'","padding:isMobile?16:24,width:'100%',maxWidth:isMobile?'100%':480,maxHeight:isMobile?'88dvh':'92vh'");
-    html=html.replace('</body>',logoInjectionScript+'</body>');
-    document.open();
-    document.write(html);
-    document.close();
+    html=html.replace('</body>',logoScript+'</body>');
+    document.open();document.write(html);document.close();
   }catch(err){
-    document.body.innerHTML='<div class="loader"><div style="font-size:28px">âš </div><div class="msg">Impossible de charger NotesFrais</div><div class="msg" style="font-size:12px">'+String(err.message||err)+'</div></div>';
+    document.body.innerHTML='<div class="loader"><div style="font-size:28px">!</div><div class="msg">Impossible de charger NotesFrais</div><div class="msg" style="font-size:12px">'+String(err.message||err)+'</div></div>';
   }
 })();
 </script>
