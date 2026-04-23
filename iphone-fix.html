@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NotesFrais</title>
+<link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/icon.svg"><meta name="theme-color" content="#1A3FB5"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="NotesFrais"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>html,body{height:100%;margin:0}body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5F3EF;color:#1A1A1A;display:flex;align-items:center;justify-content:center}.loader{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:24px}.dot{width:42px;height:42px;border-radius:50%;background:#2D5BE3;opacity:.14;animation:pulse 1.2s ease-in-out infinite}.msg{font-size:14px;color:#6B6560}@keyframes pulse{0%,100%{transform:scale(.92);opacity:.12}50%{transform:scale(1);opacity:.24}}</style>
 </head><body><div class="loader"><div class="dot"></div><div class="msg">Chargement de NotesFrais...</div></div>
 <script>
@@ -10,7 +11,7 @@
     const appRes=await fetch('app.html',{cache:'no-store'});
     if(!appRes.ok)throw new Error('HTTP app '+appRes.status);
     let html=await appRes.text();
-    const patchFiles=['notesfrais-patches.js','notesfrais-submit-summary.js'];
+    const patchFiles=['notesfrais-patches.js','notesfrais-submit-summary.js','notesfrais-pwa.js'];
     for(const file of patchFiles){
       const patchRes=await fetch(file,{cache:'no-store'});
       if(!patchRes.ok)throw new Error('HTTP patch '+patchRes.status);
