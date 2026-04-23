@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="NotesFrais">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B1F4D"/>
+      <stop offset="0.58" stop-color="#143B8C"/>
+      <stop offset="1" stop-color="#2D5BE3"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#071638" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#F5F3EF"/>
+  <rect x="64" y="64" width="384" height="384" rx="92" fill="url(#bg)" filter="url(#shadow)"/>
+  <path d="M166 157h180c18 0 32 14 32 32v154c0 18-14 32-32 32H166c-18 0-32-14-32-32V189c0-18 14-32 32-32Z" fill="#FFFFFF" opacity="0.96"/>
+  <path d="M176 214h160M176 258h160M176 302h96" fill="none" stroke="#163B8C" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="350" cy="319" r="52" fill="#FBD761"/>
+  <path d="M334 318l13 14 25-30" fill="none" stroke="#0F6E56" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="256" y="428" text-anchor="middle" font-family="Arial, sans-serif" font-size="38" font-weight="700" letter-spacing="5" fill="#FFFFFF">NF</text>
+</svg>
