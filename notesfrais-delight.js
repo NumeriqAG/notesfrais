@@ -7,11 +7,17 @@ function isMobile(){return window.innerWidth<860;}
 function findAddButton(){return [...document.querySelectorAll('button')].find(b=>/^\\+ Ajouter un frais/.test((b.textContent||'').trim()));}
 function currentTab(){const nav=[...document.querySelectorAll('select')].find(s=>[...s.options].some(o=>o.textContent==='Accueil')&&[...s.options].some(o=>o.textContent==='Relevé UBS'));return nav?nav.value:null;}
 function monthTitle(){return [...document.querySelectorAll('h1')].find(x=>/2026/.test(x.textContent||''))||null;}
+function submitVisible(){
+  const btn=[...document.querySelectorAll('button')].find(b=>/(Soumettre les frais du mois|Frais soumis)/.test(b.textContent||''));
+  if(!btn)return false;
+  const r=btn.getBoundingClientRect();
+  return r.top<window.innerHeight-24&&r.bottom>0;
+}
 function injectStyles(){
   if(document.getElementById('mike-delight-style'))return;
   const st=document.createElement('style');
   st.id='mike-delight-style';
-  st.textContent='@media(max-width:859px){body{background:linear-gradient(180deg,#F8F6F1 0%,#EFEAE1 100%)!important}button,select,input{touch-action:manipulation}button:active{transform:scale(.985)}#mike-scan-cta{position:fixed;left:16px;right:16px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:1600;border:0;border-radius:22px;padding:16px 18px;background:linear-gradient(135deg,#123B91,#2D5BE3 68%,#4C7DFF);color:#fff;font-weight:800;font-size:16px;letter-spacing:.01em;box-shadow:0 18px 42px rgba(45,91,227,.35);display:flex;align-items:center;justify-content:center;gap:10px}#mike-scan-cta span{font-size:20px}#mike-home-card{animation:mikeIn .28s ease-out both}@keyframes mikeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}}';
+  st.textContent='@media(max-width:859px){body{background:linear-gradient(180deg,#F8F6F1 0%,#EFEAE1 100%)!important}button,select,input{touch-action:manipulation}button:active{transform:scale(.985)}#mike-scan-cta{position:fixed;left:16px;right:16px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:1600;border:0;border-radius:22px;padding:16px 18px;background:linear-gradient(135deg,#123B91,#2D5BE3 68%,#4C7DFF);color:#fff;font-weight:800;font-size:16px;letter-spacing:.01em;box-shadow:0 18px 42px rgba(45,91,227,.35);display:flex;align-items:center;justify-content:center;gap:10px;transition:opacity .16s ease,transform .16s ease}#mike-scan-cta span{font-size:20px}#mike-home-card{animation:mikeIn .28s ease-out both}@keyframes mikeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}}';
   document.head.appendChild(st);
 }
 function modalOpen(){return [...document.querySelectorAll('div')].some(el=>{const s=el.getAttribute('style')||'';return s.includes('position: fixed')&&s.includes('rgba(0,0,0');});}
@@ -27,7 +33,10 @@ function injectCta(){
     cta.addEventListener('click',()=>{const target=findAddButton();if(target)target.click();});
     document.body.appendChild(cta);
   }
-  cta.style.display=modalOpen()?'none':'flex';
+  const shouldHide=modalOpen()||submitVisible();
+  cta.style.opacity=shouldHide?'0':'1';
+  cta.style.pointerEvents=shouldHide?'none':'auto';
+  cta.style.transform=shouldHide?'translateY(12px)':'translateY(0)';
 }
 function injectHomeCard(){
   const old=document.getElementById('mike-home-card');
@@ -44,6 +53,7 @@ function injectHomeCard(){
 }
 function tick(){injectStyles();injectCta();injectHomeCard();}
 window.addEventListener('resize',tick);
+window.addEventListener('scroll',tick,true);
 window.addEventListener('click',()=>setTimeout(tick,80),true);
 const timer=setInterval(tick,350);
 setTimeout(()=>clearInterval(timer),20000);
