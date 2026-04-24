@@ -9,6 +9,8 @@ function navSelect(){return [...document.querySelectorAll('select')].find(s=>[..
 function currentTab(){const nav=navSelect();return nav?nav.value:null;}
 function setTabValue(value){const nav=navSelect();if(!nav)return;nav.value=value;nav.dispatchEvent(new Event('change',{bubbles:true}));}
 function monthTitle(){return [...document.querySelectorAll('h1')].find(x=>/2026/.test(x.textContent||''))||null;}
+function activeScroller(){return [...document.querySelectorAll('div')].filter(el=>{const s=getComputedStyle(el);return (s.overflowY==='auto'||s.overflowY==='scroll')&&el.scrollHeight>el.clientHeight+20;}).sort((a,b)=>b.clientHeight-a.clientHeight)[0]||document.scrollingElement||document.documentElement;}
+function nearPageBottom(){const sc=activeScroller();const top=sc===document.scrollingElement||sc===document.documentElement?window.scrollY:sc.scrollTop;const height=sc===document.scrollingElement||sc===document.documentElement?window.innerHeight:sc.clientHeight;return top+height>=sc.scrollHeight-110;}
 function submitVisible(){
   const btn=[...document.querySelectorAll('button')].find(b=>/(Soumettre les frais du mois|Frais soumis)/.test(b.textContent||''));
   if(!btn)return false;
@@ -44,7 +46,7 @@ function injectBottomNav(){
     document.body.appendChild(nav);
   }
   [...nav.querySelectorAll('button')].forEach(b=>b.classList.toggle('active',b.dataset.tab===currentTab()));
-  const shouldHide=modalOpen()||submitVisible();
+  const shouldHide=modalOpen()||submitVisible()||nearPageBottom();
   nav.style.opacity=shouldHide?'0':'1';
   nav.style.pointerEvents=shouldHide?'none':'auto';
   nav.style.transform=shouldHide?'translateY(14px)':'translateY(0)';
@@ -62,7 +64,7 @@ function injectCta(){
     cta.addEventListener('click',()=>{const target=findAddButton();if(target)target.click();});
     document.body.appendChild(cta);
   }
-  const shouldHide=modalOpen()||submitVisible()||currentTab()!=='home';
+  const shouldHide=modalOpen()||submitVisible()||nearPageBottom()||currentTab()!=='home';
   cta.style.opacity=shouldHide?'0':'1';
   cta.style.pointerEvents=shouldHide?'none':'auto';
   cta.style.transform=shouldHide?'translateY(12px)':'translateY(0)';
