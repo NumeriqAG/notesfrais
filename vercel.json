@@ -1,7 +1,6 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/iphone-fix.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/", "destination": "/iphone-fix.html" }
   ],
   "headers": [
     {
