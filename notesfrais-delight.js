@@ -10,7 +10,14 @@ function currentTab(){const nav=navSelect();return nav?nav.value:null;}
 function setTabValue(value){const nav=navSelect();if(!nav)return;nav.value=value;nav.dispatchEvent(new Event('change',{bubbles:true}));}
 function monthTitle(){return [...document.querySelectorAll('h1')].find(x=>/2026/.test(x.textContent||''))||null;}
 function activeScroller(){return [...document.querySelectorAll('div')].filter(el=>{const s=getComputedStyle(el);return (s.overflowY==='auto'||s.overflowY==='scroll')&&el.scrollHeight>el.clientHeight+20;}).sort((a,b)=>b.clientHeight-a.clientHeight)[0]||document.scrollingElement||document.documentElement;}
-function nearPageBottom(){const sc=activeScroller();const top=sc===document.scrollingElement||sc===document.documentElement?window.scrollY:sc.scrollTop;const height=sc===document.scrollingElement||sc===document.documentElement?window.innerHeight:sc.clientHeight;return top+height>=sc.scrollHeight-110;}
+function nearPageBottom(){
+  const sc=activeScroller();
+  const top=sc===document.scrollingElement||sc===document.documentElement?window.scrollY:sc.scrollTop;
+  const height=sc===document.scrollingElement||sc===document.documentElement?window.innerHeight:sc.clientHeight;
+  const scrollable=sc.scrollHeight-height;
+  if(scrollable<180)return false;
+  return top+height>=sc.scrollHeight-110;
+}
 function submitVisible(){
   const btn=[...document.querySelectorAll('button')].find(b=>/(Soumettre les frais du mois|Frais soumis)/.test(b.textContent||''));
   if(!btn)return false;
