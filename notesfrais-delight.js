@@ -13,7 +13,7 @@ function submitVisible(){
   const btn=[...document.querySelectorAll('button')].find(b=>/(Soumettre les frais du mois|Frais soumis)/.test(b.textContent||''));
   if(!btn)return false;
   const r=btn.getBoundingClientRect();
-  return r.top<window.innerHeight-24&&r.bottom>0;
+  return r.top<window.innerHeight-18&&r.bottom>0;
 }
 function receiptFormOpen(){
   return [...document.querySelectorAll('div')].some(el=>/^Ajouter un frais$/.test((el.textContent||'').trim()))||[...document.querySelectorAll('button')].some(b=>/^Confirmer$|Upload en cours/.test((b.textContent||'').trim()));
@@ -22,15 +22,20 @@ function injectStyles(){
   if(document.getElementById('mike-delight-style'))return;
   const st=document.createElement('style');
   st.id='mike-delight-style';
-  st.textContent='@media(max-width:859px){body{background:linear-gradient(180deg,#F8F6F1 0%,#EFEAE1 100%)!important}button,select,input{touch-action:manipulation}button:active{transform:scale(.985)}#mike-bottom-nav{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:1500;background:rgba(255,255,255,.94);backdrop-filter:blur(16px);border:1px solid rgba(226,222,216,.9);border-radius:24px;box-shadow:0 18px 46px rgba(26,26,26,.16);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:7px}#mike-bottom-nav button{border:0;background:transparent;border-radius:18px;padding:8px 4px 7px;color:#6B6560;font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:3px}#mike-bottom-nav button span{font-size:18px;line-height:1}#mike-bottom-nav button.active{background:#EEF2FD;color:#1A3FB5}#mike-scan-cta{position:fixed;left:18px;right:18px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:1600;border:0;border-radius:22px;padding:15px 18px;background:linear-gradient(135deg,#123B91,#2D5BE3 68%,#4C7DFF);color:#fff;font-weight:800;font-size:16px;letter-spacing:.01em;box-shadow:0 18px 42px rgba(45,91,227,.35);display:flex;align-items:center;justify-content:center;gap:10px;transition:opacity .16s ease,transform .16s ease}#mike-scan-cta span{font-size:20px}#mike-home-card{animation:mikeIn .28s ease-out both}@keyframes mikeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}}';
+  st.textContent='@media(max-width:859px){body{background:linear-gradient(180deg,#F8F6F1 0%,#EFEAE1 100%)!important}button,select,input{touch-action:manipulation}button:active{transform:scale(.985)}#mike-bottom-nav{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:1500;background:rgba(255,255,255,.94);backdrop-filter:blur(16px);border:1px solid rgba(226,222,216,.9);border-radius:24px;box-shadow:0 18px 46px rgba(26,26,26,.16);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:7px;transition:opacity .16s ease,transform .16s ease}#mike-bottom-nav button{border:0;background:transparent;border-radius:18px;padding:8px 4px 7px;color:#6B6560;font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:3px}#mike-bottom-nav button span{font-size:18px;line-height:1}#mike-bottom-nav button.active{background:#EEF2FD;color:#1A3FB5}#mike-scan-cta{position:fixed;left:18px;right:18px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:1600;border:0;border-radius:22px;padding:15px 18px;background:linear-gradient(135deg,#123B91,#2D5BE3 68%,#4C7DFF);color:#fff;font-weight:800;font-size:16px;letter-spacing:.01em;box-shadow:0 18px 42px rgba(45,91,227,.35);display:flex;align-items:center;justify-content:center;gap:10px;transition:opacity .16s ease,transform .16s ease}#mike-scan-cta span{font-size:20px}#mike-home-card{animation:mikeIn .28s ease-out both}@keyframes mikeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}}';
   document.head.appendChild(st);
 }
 function modalOpen(){return receiptFormOpen()||[...document.querySelectorAll('button')].some(b=>/^Annuler$/.test((b.textContent||'').trim()))||[...document.querySelectorAll('div')].some(el=>{const s=el.getAttribute('style')||'';return s.includes('position: fixed')&&s.includes('rgba(0,0,0');});}
+function hideOldNavigationLabel(select){
+  const section=select&&select.closest('div')&&select.closest('div').parentElement;
+  if(section&&/NAVIGATION/.test(section.textContent||''))section.style.display='none';
+}
 function injectBottomNav(){
   let nav=document.getElementById('mike-bottom-nav');
   if(!isMobile()){if(nav)nav.remove();return;}
   const select=navSelect();
   if(!select)return;
+  hideOldNavigationLabel(select);
   if(!nav){
     nav=document.createElement('div');
     nav.id='mike-bottom-nav';
@@ -39,8 +44,11 @@ function injectBottomNav(){
     document.body.appendChild(nav);
   }
   [...nav.querySelectorAll('button')].forEach(b=>b.classList.toggle('active',b.dataset.tab===currentTab()));
-  nav.style.display=modalOpen()?'none':'grid';
-  select.closest('div').style.display='none';
+  const shouldHide=modalOpen()||submitVisible();
+  nav.style.opacity=shouldHide?'0':'1';
+  nav.style.pointerEvents=shouldHide?'none':'auto';
+  nav.style.transform=shouldHide?'translateY(14px)':'translateY(0)';
+  nav.style.display='grid';
 }
 function injectCta(){
   let cta=document.getElementById('mike-scan-cta');
