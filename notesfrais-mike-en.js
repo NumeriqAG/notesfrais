@@ -137,7 +137,7 @@
     }
     html = html.replace(
       />Salut Mike,[^<]*<\/div><div style="font-size:13px;opacity:\.82;line-height:1\.45">[^<]*<\/div>/g,
-      ">Hi Mike, let's capture this quickly.</div><div style=\"font-size:13px;opacity:.82;line-height:1.45\">Take the receipt, check the amount, and finance will have everything ready.</div>"
+      ">Hi Mike, let us capture this quickly.</div><div style=\"font-size:13px;opacity:.82;line-height:1.45\">Take the receipt, check the amount, and finance will have everything ready.</div>"
     );
     html = html.replace('</body>', '<script>window.NOTESFRAIS_ENGLISH=true;console.info("Mike English UI active");<\/script></body>');
     return html;
