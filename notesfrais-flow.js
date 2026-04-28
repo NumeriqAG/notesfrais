@@ -20,8 +20,8 @@ function clearExpenseDraft(){try{localStorage.removeItem(NOTESFRAIS_DRAFT_KEY);}
 
     html = html.replace(/onClose\(\);/g, `clearExpenseDraft();onClose();`);
     html = html.replace(
-      `<button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'var(--t2)',fontSize:24,lineHeight:1}}>×</button>`,
-      `<button onClick={()=>{saveExpenseDraft(form);onClose();}} style={{background:'none',border:'none',cursor:'pointer',color:'var(--t2)',fontSize:24,lineHeight:1}}>×</button>`
+      `<button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'var(--t2)',fontSize:24,lineHeight:1}}>Ã—</button>`,
+      `<button onClick={()=>{saveExpenseDraft(form);onClose();}} style={{background:'none',border:'none',cursor:'pointer',color:'var(--t2)',fontSize:24,lineHeight:1}}>Ã—</button>`
     );
     html = html.replace(
       `<button onClick={onClose} style={{...bS,justifyContent:'center'}}>Annuler</button>`,
@@ -34,17 +34,17 @@ function clearExpenseDraft(){try{localStorage.removeItem(NOTESFRAIS_DRAFT_KEY);}
   const [quickAdd,setQuickAdd]=useState(false);`
     );
     html = html.replace(
-      `const addExpense=useCallback(async(e)=>{setSyncing(true);try{const s=await insertExpense(e);setExpenses(p=>[s,...p]);notify('✅ Frais enregistré !');}catch(e){notify('❌ '+e.message);}finally{setSyncing(false);}},[]);`,
-      `const addExpense=useCallback(async(e)=>{setSyncing(true);try{const s=await insertExpense(e);setExpenses(p=>[s,...p]);notify('✅ Frais enregistré !');setQuickAdd(true);}catch(e){notify('❌ '+e.message);}finally{setSyncing(false);}},[]);`
+      `const addExpense=useCallback(async(e)=>{setSyncing(true);try{const s=await insertExpense(e);setExpenses(p=>[s,...p]);notify('âœ… Frais enregistrÃ© !');}catch(e){notify('âŒ '+e.message);}finally{setSyncing(false);}},[]);`,
+      `const addExpense=useCallback(async(e)=>{setSyncing(true);try{const s=await insertExpense(e);setExpenses(p=>[s,...p]);notify('âœ… Frais enregistrÃ© !');setQuickAdd(true);}catch(e){notify('âŒ '+e.message);}finally{setSyncing(false);}},[]);`
     );
     html = html.replace(
-      `window.addEventListener('notesfrais-offline-queued',()=>{refresh();notify('📴 Frais gardé sur cet iPhone. Sync dès retour internet.');});`,
-      `window.addEventListener('notesfrais-offline-queued',()=>{refresh();setQuickAdd(true);notify('📴 Frais gardé sur cet iPhone. Sync dès retour internet.');});`
+      `window.addEventListener('notesfrais-offline-queued',()=>{refresh();notify('ðŸ“´ Frais gardÃ© sur cet iPhone. Sync dÃ¨s retour internet.');});`,
+      `window.addEventListener('notesfrais-offline-queued',()=>{refresh();setQuickAdd(true);notify('ðŸ“´ Frais gardÃ© sur cet iPhone. Sync dÃ¨s retour internet.');});`
     );
     html = html.replace(
       `{showUBS&&<UBSModal onClose={()=>setShowUBS(false)} onImport={handleUBS}/>}
       {showAdd&&<AddModal`,
-      `{quickAdd&&<div style={{position:'fixed',left:isMobile?14:'50%',right:isMobile?14:'auto',bottom:isMobile?'calc(92px + env(safe-area-inset-bottom))':24,transform:isMobile?'none':'translateX(-50%)',background:'#111',color:'#fff',borderRadius:18,padding:'12px 14px',zIndex:2200,boxShadow:'0 16px 44px rgba(0,0,0,0.24)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,minWidth:isMobile?'auto':360}}><div><div style={{fontWeight:700,fontSize:13}}>Frais gardé</div><div style={{fontSize:12,opacity:.72}}>Tu peux scanner le suivant.</div></div><button onClick={()=>{setQuickAdd(false);setShowAdd(true);}} style={{...bP,padding:'9px 12px',fontSize:12}}>Scanner un autre</button><button onClick={()=>setQuickAdd(false)} style={{background:'transparent',border:0,color:'#fff',fontSize:18,cursor:'pointer'}}>×</button></div>}
+      `{quickAdd&&<div style={{position:'fixed',left:isMobile?14:'50%',right:isMobile?14:'auto',bottom:isMobile?'calc(92px + env(safe-area-inset-bottom))':24,transform:isMobile?'none':'translateX(-50%)',background:'#111',color:'#fff',borderRadius:18,padding:'12px 14px',zIndex:2200,boxShadow:'0 16px 44px rgba(0,0,0,0.24)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,minWidth:isMobile?'auto':360}}><div><div style={{fontWeight:700,fontSize:13}}>Frais gardÃ©</div><div style={{fontSize:12,opacity:.72}}>Tu peux scanner le suivant.</div></div><button onClick={()=>{setQuickAdd(false);setShowAdd(true);}} style={{...bP,padding:'9px 12px',fontSize:12}}>Scanner un autre</button><button onClick={()=>setQuickAdd(false)} style={{background:'transparent',border:0,color:'#fff',fontSize:18,cursor:'pointer'}}>Ã—</button></div>}
       {showUBS&&<UBSModal onClose={()=>setShowUBS(false)} onImport={handleUBS}/>}
       {showAdd&&<AddModal`
     );
@@ -60,7 +60,11 @@ function clearExpenseDraft(){try{localStorage.removeItem(NOTESFRAIS_DRAFT_KEY);}
     );
     html = html.replace(
       `</div><div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>{[{id:'all',label:'Tous',icon:''},...CATS].map(c=>`,
-      `<div style={{marginBottom:12}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un reçu, montant, commerçant..." style={{...inp,background:'#fff',fontSize:isMobile?16:13,padding:isMobile?'12px 14px':'9px 12px'}}/></div><div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>{[{id:'all',label:'Tous',icon:''},...CATS].map(c=>`
+      `</div><div style={{marginBottom:12}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un reÃ§u, montant, commerÃ§ant..." style={{...inp,background:'#fff',fontSize:isMobile?16:13,padding:isMobile?'12px 14px':'9px 12px'}}/></div><div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>{[{id:'all',label:'Tous',icon:''},...CATS].map(c=>`
+    );
+    html = html.replace(
+      `<div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>`,
+      `<div style={{marginBottom:12}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un reÃ§u, montant, commerÃ§ant..." style={{...inp,background:'#fff',fontSize:isMobile?16:13,padding:isMobile?'12px 14px':'9px 12px'}}/></div><div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>`
     );
 
     return html;
