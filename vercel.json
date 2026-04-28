@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/mike", "destination": "/mike.html" },
+    { "source": "/test", "destination": "/test.html" },
     { "source": "/", "destination": "/iphone-fix.html" }
   ],
   "headers": [
