@@ -1,5 +1,18 @@
-const CACHE_NAME = 'notesfrais-shell-v1';
-const SHELL_FILES = ['/', '/index.html', '/app.html', '/manifest.webmanifest', '/icon.svg'];
+const CACHE_NAME = 'notesfrais-shell-v2';
+const SHELL_FILES = [
+  '/',
+  '/index.html',
+  '/iphone-fix.html',
+  '/test',
+  '/test.html',
+  '/mike',
+  '/mike.html',
+  '/app.html',
+  '/manifest.webmanifest',
+  '/manifest-test.webmanifest',
+  '/manifest-mike.webmanifest',
+  '/icon.svg'
+];
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -10,7 +23,8 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -18,6 +32,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
+
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
@@ -26,6 +41,13 @@ self.addEventListener('fetch', event => {
       const copy = response.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => undefined);
       return response;
-    }).catch(() => caches.match(request).then(cached => cached || caches.match('/')))
+    }).catch(() => {
+      return caches.match(request).then(cached => {
+        if (cached) return cached;
+        if (url.pathname.startsWith('/test')) return caches.match('/test.html');
+        if (url.pathname.startsWith('/mike')) return caches.match('/mike.html');
+        return caches.match('/iphone-fix.html') || caches.match('/');
+      });
+    })
   );
 });
