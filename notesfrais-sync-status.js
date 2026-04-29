@@ -20,8 +20,8 @@ async function offlineCount(){
   const db=await openDb();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(STORE,'readonly');
-    const req=tx.objectStore(STORE).count();
-    req.onsuccess=()=>resolve(req.result||0);
+    const req=tx.objectStore(STORE).getAll();
+    req.onsuccess=()=>resolve((req.result||[]).filter(item=>(item.channel||'mike')==='test').length);
     req.onerror=()=>reject(req.error);
   });
 }
