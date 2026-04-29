@@ -13,8 +13,14 @@ function isLocked(){
   return /^Code d|^Access code/.test(title);
 }
 function clickNativeNav(target){
+  const select=[...document.querySelectorAll('select')].find(s=>[...s.options].some(o=>o.value==='home')&&[...s.options].some(o=>o.value==='recon'));
+  if(select){
+    select.value=target;
+    select.dispatchEvent(new Event('change',{bubbles:true}));
+    return;
+  }
   const patterns={home:/Accueil/,history:/Historique/,stats:/Statistiques/,recon:/UBS/};
-  const btn=[...document.querySelectorAll('button')].find(b=>patterns[target].test(textOf(b))&&b.id!=='test-scan-cta');
+  const btn=[...document.querySelectorAll('button')].find(b=>patterns[target].test(textOf(b))&&b.id!=='test-scan-cta'&&!b.closest('#test-bottom-nav'));
   if(btn)btn.click();
 }
 function activeTab(){
