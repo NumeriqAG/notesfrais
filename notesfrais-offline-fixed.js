@@ -43,6 +43,28 @@ function lastDayOfMonth(month){`
       );
 
       html = html.replace(
+        `const loadData=useCallback(async()=>{setLoading(true);setDbError(null);try{const d=await fetchExpenses(month);setExpenses(d);}catch(e){setDbError(e.message);}finally{setLoading(false);}},[month]);`,
+        `const loadData=useCallback(async()=>{
+    setLoading(true);setDbError(null);
+    let timedOut=false;
+    const bootTimer=setTimeout(()=>{
+      timedOut=true;
+      setDbError('Mode local - connexion indisponible. Les frais saisis hors ligne restent sur cet appareil.');
+      setLoading(false);
+    },NOTESFRAIS_FETCH_TIMEOUT_MS+1000);
+    try{
+      const d=await fetchExpensesWithTimeout(month);
+      if(!timedOut)setExpenses(d);
+    }catch(e){
+      setDbError(e.message);
+    }finally{
+      clearTimeout(bootTimer);
+      setLoading(false);
+    }
+  },[month]);`
+      );
+
+      html = html.replace(
         `const d=await fetchExpenses(month);setExpenses(d);`,
         `const d=await fetchExpensesWithTimeout(month);setExpenses(d);`
       );
