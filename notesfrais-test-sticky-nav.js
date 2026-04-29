@@ -36,7 +36,7 @@ function ensureStyle(){
   if(document.getElementById('test-sticky-nav-style'))return;
   const st=document.createElement('style');
   st.id='test-sticky-nav-style';
-  st.textContent='@media(max-width:859px){body{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important}#root>div{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important}#root>div>div:last-child{padding-bottom:calc(180px + env(safe-area-inset-bottom))!important}#mike-bottom-nav,#mike-scan-cta{display:none!important}#test-bottom-nav{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:4200;background:rgba(255,255,255,.96);backdrop-filter:blur(18px);border:1px solid rgba(226,222,216,.92);border-radius:24px;box-shadow:0 18px 46px rgba(26,26,26,.18);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:7px}#test-bottom-nav button{border:0;background:transparent;border-radius:18px;padding:8px 4px 7px;color:#6B6560;font-size:10px;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:3px}#test-bottom-nav button span{font-size:16px;line-height:1;font-weight:900}#test-bottom-nav button.active{background:#EEF2FD;color:#1A3FB5}#test-scan-cta{position:fixed;left:18px;right:18px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:4210;border:0;border-radius:22px;padding:15px 18px;background:linear-gradient(135deg,#FFB000,#FF6A00 68%,#FF3D00);color:#1A1200;font-weight:900;font-size:16px;letter-spacing:.01em;box-shadow:0 18px 42px rgba(255,106,0,.42),0 0 0 1px rgba(255,255,255,.55) inset;display:flex;align-items:center;justify-content:center;gap:10px;transition:opacity .16s ease,transform .16s ease}.test-hidden{opacity:0!important;pointer-events:none!important;transform:translateY(12px)!important}}@media(min-width:860px){#test-bottom-nav,#test-scan-cta{display:none!important}}';
+  st.textContent='@media(max-width:859px){body{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important}#root>div{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important}#root>div>div:last-child{padding-bottom:calc(180px + env(safe-area-inset-bottom))!important}#mike-bottom-nav,#mike-scan-cta{display:none!important}#test-bottom-nav{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:4200;background:rgba(255,255,255,.96);backdrop-filter:blur(18px);border:1px solid rgba(226,222,216,.92);border-radius:24px;box-shadow:0 18px 46px rgba(26,26,26,.18);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:7px}#test-bottom-nav button{border:0;background:transparent;border-radius:18px;padding:13px 4px;color:#6B6560;font-size:12px;font-weight:850;display:flex;align-items:center;justify-content:center}#test-bottom-nav button.active{background:#EEF2FD;color:#1A3FB5}#test-scan-cta{position:fixed;left:18px;right:18px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:4210;border:0;border-radius:22px;padding:15px 18px;background:linear-gradient(135deg,#FFB000,#FF6A00 68%,#FF3D00);color:#1A1200;font-weight:900;font-size:16px;letter-spacing:.01em;box-shadow:0 18px 42px rgba(255,106,0,.42),0 0 0 1px rgba(255,255,255,.55) inset;display:flex;align-items:center;justify-content:center;gap:10px;transition:opacity .16s ease,transform .16s ease}.test-hidden{opacity:0!important;pointer-events:none!important;transform:translateY(12px)!important}}@media(min-width:860px){#test-bottom-nav,#test-scan-cta{display:none!important}}';
   document.head.appendChild(st);
 }
 function hideFloating(){
@@ -50,12 +50,12 @@ function ensureBottomNav(){
   if(!nav){
     nav=document.createElement('div');
     nav.id='test-bottom-nav';
-    const items=[['home','H','Accueil'],['history','F','Frais'],['stats','S','Stats'],['recon','U','UBS']];
-    items.forEach(([id,icon,label])=>{
+    const items=[['home','Accueil'],['history','Frais'],['stats','Stats'],['recon','UBS']];
+    items.forEach(([id,label])=>{
       const b=document.createElement('button');
       b.type='button';
       b.dataset.tab=id;
-      b.innerHTML='<span>'+icon+'</span>'+label;
+      b.textContent=label;
       b.addEventListener('click',()=>clickNativeNav(id));
       nav.appendChild(b);
     });
