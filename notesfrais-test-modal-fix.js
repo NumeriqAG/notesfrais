@@ -42,8 +42,25 @@ function apply(){
   const title=findModalTitle();
   const card=findCard(title);
   const shell=findShell(card);
-  if(card)card.classList.add('test-expense-modal-card');
-  if(shell)shell.classList.add('test-expense-modal-shell');
+  if(card){
+    card.classList.add('test-expense-modal-card');
+    if(isMobile()){
+      card.style.setProperty('position','fixed','important');
+      card.style.setProperty('left','0','important');
+      card.style.setProperty('right','0','important');
+      card.style.setProperty('top','auto','important');
+      card.style.setProperty('bottom','0','important');
+      card.style.setProperty('width','100%','important');
+      card.style.setProperty('max-width','100%','important');
+      card.style.setProperty('max-height','calc(92dvh - env(safe-area-inset-top))','important');
+      card.style.setProperty('overflow-y','auto','important');
+      card.style.setProperty('-webkit-overflow-scrolling','touch','important');
+    }
+  }
+  if(shell){
+    shell.classList.add('test-expense-modal-shell');
+    if(isMobile())shell.style.setProperty('z-index','5000','important');
+  }
 }
 window.addEventListener('resize',apply);
 window.addEventListener('click',()=>setTimeout(apply,80),true);
