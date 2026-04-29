@@ -22,6 +22,7 @@ function findCard(title){
   let el=title;
   while(el&&el!==document.body){
     const style=el.getAttribute('style')||'';
+    if(style.includes('background')&&style.includes('255, 255, 255')&&style.includes('max-height'))return el;
     if(style.includes('background')&&style.includes('#fff')&&style.includes('maxHeight'))return el;
     el=el.parentElement;
   }
