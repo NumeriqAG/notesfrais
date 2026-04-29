@@ -8,26 +8,26 @@
     const script = `<script id="notesfrais-test-sticky-nav">(function(){
 function isMobile(){return window.innerWidth<860;}
 function textOf(el){return (el.textContent||'').replace(/\\s+/g,' ').trim();}
+function isLocked(){
+  const title=textOf(document.querySelector('h1')||document.body);
+  return /^Code d|^Access code/.test(title);
+}
 function clickNativeNav(target){
-  const patterns={
-    home:/Accueil/,
-    history:/Historique/,
-    stats:/Statistiques/,
-    recon:/Relevé UBS|Releve UBS|UBS/
-  };
+  const patterns={home:/Accueil/,history:/Historique/,stats:/Statistiques/,recon:/UBS/};
   const btn=[...document.querySelectorAll('button')].find(b=>patterns[target].test(textOf(b))&&b.id!=='test-scan-cta');
   if(btn)btn.click();
 }
 function activeTab(){
-  const title=textOf([...document.querySelectorAll('h1')][0]||document.body);
+  const title=textOf(document.querySelector('h1')||document.body);
   if(/Historique/.test(title))return 'history';
   if(/Statistiques/.test(title))return 'stats';
-  if(/Relevé UBS|Releve UBS/.test(title))return 'recon';
+  if(/UBS/.test(title))return 'recon';
   return 'home';
 }
 function findAddButton(){
   return [...document.querySelectorAll('button')].find(b=>/^\\+ Ajouter un frais/.test(textOf(b)));
 }
+function appReady(){return !isLocked()&&!!findAddButton();}
 function modalOpen(){
   return [...document.querySelectorAll('button')].some(b=>/^Confirmer$|Upload en cours|Annuler$/.test(textOf(b)))
     || [...document.querySelectorAll('div')].some(el=>/^Ajouter un frais$/.test(textOf(el)));
@@ -36,15 +36,21 @@ function ensureStyle(){
   if(document.getElementById('test-sticky-nav-style'))return;
   const st=document.createElement('style');
   st.id='test-sticky-nav-style';
-  st.textContent='@media(max-width:859px){body{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important}#root>div{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important}#root>div>div:last-child{padding-bottom:calc(180px + env(safe-area-inset-bottom))!important}#mike-bottom-nav,#mike-scan-cta{display:none!important}#test-bottom-nav{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:4200;background:rgba(255,255,255,.96);backdrop-filter:blur(18px);border:1px solid rgba(226,222,216,.92);border-radius:24px;box-shadow:0 18px 46px rgba(26,26,26,.18);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:7px}#test-bottom-nav button{border:0;background:transparent;border-radius:18px;padding:8px 4px 7px;color:#6B6560;font-size:10px;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:3px}#test-bottom-nav button span{font-size:18px;line-height:1}#test-bottom-nav button.active{background:#EEF2FD;color:#1A3FB5}#test-scan-cta{position:fixed;left:18px;right:18px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:4210;border:0;border-radius:22px;padding:15px 18px;background:linear-gradient(135deg,#FFB000,#FF6A00 68%,#FF3D00);color:#1A1200;font-weight:900;font-size:16px;letter-spacing:.01em;box-shadow:0 18px 42px rgba(255,106,0,.42),0 0 0 1px rgba(255,255,255,.55) inset;display:flex;align-items:center;justify-content:center;gap:10px;transition:opacity .16s ease,transform .16s ease}#test-scan-cta span{font-size:21px}.test-hidden{opacity:0!important;pointer-events:none!important;transform:translateY(12px)!important}}@media(min-width:860px){#test-bottom-nav,#test-scan-cta{display:none!important}}';
+  st.textContent='@media(max-width:859px){body{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important}#root>div{padding-bottom:calc(150px + env(safe-area-inset-bottom))!important}#root>div>div:last-child{padding-bottom:calc(180px + env(safe-area-inset-bottom))!important}#mike-bottom-nav,#mike-scan-cta{display:none!important}#test-bottom-nav{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:4200;background:rgba(255,255,255,.96);backdrop-filter:blur(18px);border:1px solid rgba(226,222,216,.92);border-radius:24px;box-shadow:0 18px 46px rgba(26,26,26,.18);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:7px}#test-bottom-nav button{border:0;background:transparent;border-radius:18px;padding:8px 4px 7px;color:#6B6560;font-size:10px;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:3px}#test-bottom-nav button span{font-size:16px;line-height:1;font-weight:900}#test-bottom-nav button.active{background:#EEF2FD;color:#1A3FB5}#test-scan-cta{position:fixed;left:18px;right:18px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:4210;border:0;border-radius:22px;padding:15px 18px;background:linear-gradient(135deg,#FFB000,#FF6A00 68%,#FF3D00);color:#1A1200;font-weight:900;font-size:16px;letter-spacing:.01em;box-shadow:0 18px 42px rgba(255,106,0,.42),0 0 0 1px rgba(255,255,255,.55) inset;display:flex;align-items:center;justify-content:center;gap:10px;transition:opacity .16s ease,transform .16s ease}.test-hidden{opacity:0!important;pointer-events:none!important;transform:translateY(12px)!important}}@media(min-width:860px){#test-bottom-nav,#test-scan-cta{display:none!important}}';
   document.head.appendChild(st);
+}
+function hideFloating(){
+  const nav=document.getElementById('test-bottom-nav');
+  const cta=document.getElementById('test-scan-cta');
+  if(nav)nav.style.display='none';
+  if(cta)cta.style.display='none';
 }
 function ensureBottomNav(){
   let nav=document.getElementById('test-bottom-nav');
   if(!nav){
     nav=document.createElement('div');
     nav.id='test-bottom-nav';
-    const items=[['home','🏠','Accueil'],['history','🧾','Frais'],['stats','📊','Stats'],['recon','🏦','UBS']];
+    const items=[['home','H','Accueil'],['history','F','Frais'],['stats','S','Stats'],['recon','U','UBS']];
     items.forEach(([id,icon,label])=>{
       const b=document.createElement('button');
       b.type='button';
@@ -65,7 +71,7 @@ function ensureScanCta(){
     cta=document.createElement('button');
     cta.id='test-scan-cta';
     cta.type='button';
-    cta.innerHTML='<span>📸</span> Scanner un reçu';
+    cta.textContent='Scanner un recu';
     cta.addEventListener('click',()=>{const add=findAddButton();if(add)add.click();});
     document.body.appendChild(cta);
   }
@@ -75,6 +81,7 @@ function ensureScanCta(){
 }
 function tick(){
   ensureStyle();
+  if(!appReady()){hideFloating();return;}
   ensureBottomNav();
   ensureScanCta();
 }
