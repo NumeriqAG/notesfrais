@@ -29,7 +29,7 @@ function ensureStyle(){
   if(document.getElementById('sync-status-style'))return;
   const style=document.createElement('style');
   style.id='sync-status-style';
-  style.textContent='@media(max-width:859px){#sync-status-chip{left:14px;right:14px;bottom:calc(148px + env(safe-area-inset-bottom));top:auto;justify-content:flex-start}}#sync-status-chip{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:2450;display:flex;align-items:center;gap:10px;border-radius:999px;padding:10px 14px;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12px;font-weight:800;letter-spacing:.01em;box-shadow:0 12px 34px rgba(26,26,26,.14);border:1px solid rgba(255,255,255,.7);backdrop-filter:blur(14px);transition:opacity .18s ease,transform .18s ease}#sync-status-chip .dot{width:9px;height:9px;border-radius:999px;flex:0 0 auto}#sync-status-chip.safe{background:rgba(225,245,238,.96);color:#0F6E56}#sync-status-chip.safe .dot{background:#0F6E56}#sync-status-chip.waiting{background:rgba(250,238,218,.98);color:#9A5A00}#sync-status-chip.waiting .dot{background:#FF9F1A;box-shadow:0 0 0 5px rgba(255,159,26,.18)}#sync-status-chip.offline{background:rgba(252,235,235,.98);color:#A32D2D}#sync-status-chip.offline .dot{background:#A32D2D}';
+  style.textContent='#sync-status-chip{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:2450;display:flex;align-items:center;gap:10px;border-radius:999px;padding:10px 14px;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12px;font-weight:800;letter-spacing:.01em;line-height:1.15;width:auto;height:auto;min-height:0;max-height:44px;box-shadow:0 12px 34px rgba(26,26,26,.14);border:1px solid rgba(255,255,255,.7);backdrop-filter:blur(14px);transition:opacity .18s ease,transform .18s ease}#sync-status-chip .dot{width:9px;height:9px;border-radius:999px;flex:0 0 auto}#sync-status-chip.safe{background:rgba(225,245,238,.96);color:#0F6E56}#sync-status-chip.safe .dot{background:#0F6E56}#sync-status-chip.waiting{background:rgba(250,238,218,.98);color:#9A5A00}#sync-status-chip.waiting .dot{background:#FF9F1A;box-shadow:0 0 0 5px rgba(255,159,26,.18)}#sync-status-chip.offline{background:rgba(252,235,235,.98);color:#A32D2D}#sync-status-chip.offline .dot{background:#A32D2D}@media(max-width:859px){#sync-status-chip{top:calc(10px + env(safe-area-inset-top));left:12px;right:auto;bottom:auto;transform:none;max-width:calc(100vw - 24px);justify-content:flex-start}}';
   document.head.appendChild(style);
 }
 function ensureChip(){
@@ -44,6 +44,12 @@ function ensureChip(){
 }
 async function render(){
   const chip=ensureChip();
+  const title=(document.querySelector('h1')?.textContent||'').trim();
+  if(/^Code d|^Access code/.test(title)){
+    chip.style.display='none';
+    return;
+  }
+  chip.style.display='flex';
   const count=await offlineCount().catch(()=>0);
   const text=chip.querySelector('.text');
   chip.classList.remove('safe','waiting','offline');
