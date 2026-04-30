@@ -2,9 +2,24 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(html.includes('NOTESFRAIS_PAYMENT_CARD_PATCH_V2_DONE')) return html;
+    if(html.includes('NOTESFRAIS_PAYMENT_CARD_PATCH_V3_DONE')) return html;
 
-    html = html.replace('</script>', '<!-- NOTESFRAIS_PAYMENT_CARD_PATCH_V2_DONE --></script>');
+    html = html.replace('</script>', '<!-- NOTESFRAIS_PAYMENT_CARD_PATCH_V3_DONE --></script>');
+
+    if(!html.includes('function getPaymentCardLabel')){
+      html = html.replace(
+        `const isPDF=u=>u&&u.toLowerCase().includes('.pdf');`,
+        `const isPDF=u=>u&&u.toLowerCase().includes('.pdf');
+function getPaymentCardLabel(note){
+  const m=String(note||'').match(/Carte utilisee:\\s*(entreprise|perso)/i);
+  if(!m)return '';
+  return m[1].toLowerCase()==='entreprise'?"Carte entreprise":"Carte perso";
+}
+function cleanPaymentCardNote(note){
+  return String(note||'').split(/\\n+/).filter(line=>!/^Carte utilisee:/i.test(line.trim())).join(' · ');
+}`
+      );
+    }
 
     if(!html.includes('paymentCard')){
       html = html.replace(
@@ -32,7 +47,6 @@
       );
     }
 
-    // Older test cache could have inserted two card fields. Keep only the first one.
     html = html.replace(
       /(<div(?: data-payment-card-field="true")?><label style=\{lbl\}>Carte utilisee \*<\/label><select[\s\S]*?<\/select><\/div>)\s*(?:<div(?: data-payment-card-field="true")?><label style=\{lbl\}>Carte utilisee \*<\/label><select[\s\S]*?<\/select><\/div>)+/,
       '$1'
@@ -49,6 +63,11 @@
     html = html.replace(
       `await onAdd({...form,currency:'CHF',amountCHF:parseFloat(form.amount),amount:parseFloat(form.amount),tva:parseFloat(form.tva)||0,status:'pending',receiptPath,receiptName});`,
       `const cardLabel=form.paymentCard==='entreprise'?'Carte utilisee: entreprise':form.paymentCard==='perso'?'Carte utilisee: perso':'';\n      await onAdd({...form,note:[cardLabel,form.note].filter(Boolean).join('\\n'),currency:'CHF',amountCHF:parseFloat(form.amount),amount:parseFloat(form.amount),tva:parseFloat(form.tva)||0,status:'pending',receiptPath,receiptName});`
+    );
+
+    html = html.replace(
+      `{e.note&&<span>· {e.note}</span>}`,
+      `{getPaymentCardLabel(e.note)&&<span style={{background:'var(--al)',color:'var(--accent)',borderRadius:999,padding:'2px 7px',fontWeight:600}}>💳 {getPaymentCardLabel(e.note)}</span>}{cleanPaymentCardNote(e.note)&&<span>· {cleanPaymentCardNote(e.note)}</span>}`
     );
 
     return html;
