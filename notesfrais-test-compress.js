@@ -50,6 +50,7 @@ async function compressReceiptImageForTest(file){
     return file;
   }
 }
+window.__notesfraisCompressReceiptImageForTest=compressReceiptImageForTest;
 `;
     html = html.replace('function AddModal({onClose,onAdd,month}){', helper + '\nfunction AddModal({onClose,onAdd,month}){');
 
