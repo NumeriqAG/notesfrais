@@ -2,7 +2,7 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
+    if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;
     if(html.includes('notesfrais-test-modal-fix')) return html;
 
     const script = `<script id="notesfrais-test-modal-fix">(function(){
@@ -16,7 +16,7 @@ function addStyle(){
   document.head.appendChild(st);
 }
 function findModalTitle(){
-  return [...document.querySelectorAll('div')].find(el=>textOf(el)==='Ajouter un frais');
+  return [...document.querySelectorAll('div')].find(el=>/^Ajouter un frais$|^Add expense$/.test(textOf(el)));
 }
 function findCard(title){
   let el=title;
