@@ -49,14 +49,14 @@ async function render(){
   const red=root.getPropertyValue('--red').trim()||'#A32D2D';
   const count=await offlineCount().catch(()=>0);
   if(count>0){
-    applyStatus(line.label,line.dot,amber,'Supabase connecte - '+count+' a synchroniser');
+    applyStatus(line.label,line.dot,amber,'Supabase connecté - '+count+' à synchroniser');
     return;
   }
   if(!navigator.onLine){
-    applyStatus(line.label,line.dot,red,'Hors ligne - sauvegarde locale prete');
+    applyStatus(line.label,line.dot,red,'Hors ligne - sauvegarde locale prête');
     return;
   }
-  applyStatus(line.label,line.dot,green,'Supabase connecte - synchronise');
+  applyStatus(line.label,line.dot,green,'Supabase connecté - synchronisé');
 }
 window.addEventListener('online',()=>setTimeout(render,250));
 window.addEventListener('offline',render);
