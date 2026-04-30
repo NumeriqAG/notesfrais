@@ -2,12 +2,14 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
+    if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;
     if(html.includes('notesfrais-sync-status')) return html;
 
     const syncStatusScript = `<script id="notesfrais-sync-status">(function(){
 const DB='notesfrais-offline-v1';
 const STORE='expenses';
+const CHANNEL=window.NOTESFRAIS_CHANNEL||'mike';
+const IS_MIKE=CHANNEL==='mike';
 function openDb(){
   return new Promise((resolve,reject)=>{
     const req=indexedDB.open(DB,1);
@@ -21,13 +23,13 @@ async function offlineCount(){
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(STORE,'readonly');
     const req=tx.objectStore(STORE).getAll();
-    req.onsuccess=()=>resolve((req.result||[]).filter(item=>(item.channel||'mike')==='test').length);
+    req.onsuccess=()=>resolve((req.result||[]).filter(item=>(item.channel||'mike')===CHANNEL).length);
     req.onerror=()=>reject(req.error);
   });
 }
 function findSupabaseLine(){
   const spans=[...document.querySelectorAll('span')];
-  const label=spans.find(span=>/Supabase connect|Erreur connexion|Hors ligne|synchronis|synchroniser/i.test(span.textContent||''));
+  const label=spans.find(span=>/Supabase connect|Erreur connexion|Connection error|Hors ligne|Offline|synchronis|sync/i.test(span.textContent||''));
   if(!label)return null;
   const row=label.parentElement;
   const dot=row&&[...row.children].find(el=>el.tagName==='SPAN'&&el !== label);
@@ -49,14 +51,14 @@ async function render(){
   const red=root.getPropertyValue('--red').trim()||'#A32D2D';
   const count=await offlineCount().catch(()=>0);
   if(count>0){
-    applyStatus(line.label,line.dot,amber,'Supabase connecté - '+count+' à synchroniser');
+    applyStatus(line.label,line.dot,amber,IS_MIKE?'Supabase connected - '+count+' to sync':'Supabase connecté - '+count+' à synchroniser');
     return;
   }
   if(!navigator.onLine){
-    applyStatus(line.label,line.dot,red,'Hors ligne - sauvegarde locale prête');
+    applyStatus(line.label,line.dot,red,IS_MIKE?'Offline - local save ready':'Hors ligne - sauvegarde locale prête');
     return;
   }
-  applyStatus(line.label,line.dot,green,'Supabase connecté - synchronisé');
+  applyStatus(line.label,line.dot,green,IS_MIKE?'Supabase connected - synced':'Supabase connecté - synchronisé');
 }
 window.addEventListener('online',()=>setTimeout(render,250));
 window.addEventListener('offline',render);
