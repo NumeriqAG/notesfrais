@@ -2,9 +2,9 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(html.includes('NOTESFRAIS_PAYMENT_CARD_PATCH_DONE')) return html;
+    if(html.includes('NOTESFRAIS_PAYMENT_CARD_PATCH_V2_DONE')) return html;
 
-    html = html.replace('</script>', '<!-- NOTESFRAIS_PAYMENT_CARD_PATCH_DONE --></script>');
+    html = html.replace('</script>', '<!-- NOTESFRAIS_PAYMENT_CARD_PATCH_V2_DONE --></script>');
 
     if(!html.includes('paymentCard')){
       html = html.replace(
@@ -24,17 +24,19 @@
       );
     }
 
-    const cardField = `<div><label style={lbl}>Carte utilisee *</label><select style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.paymentCard||''} onChange={e=>setForm({...form,paymentCard:e.target.value})}><option value="">Choisir la carte...</option><option value="entreprise">Carte de l'entreprise</option><option value="perso">Carte perso</option></select></div>`;
-    if(!html.includes('Carte utilisee *')){
+    const cardField = `<div data-payment-card-field="true"><label style={lbl}>Carte utilisee *</label><select style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.paymentCard||''} onChange={e=>setForm({...form,paymentCard:e.target.value})}><option value="">Choisir la carte...</option><option value="entreprise">Carte de l'entreprise</option><option value="perso">Carte perso</option></select></div>`;
+    if(!html.includes('data-payment-card-field')){
       html = html.replace(
         /(<div><label style=\{lbl\}>Date<\/label><input[\s\S]*?<\/div>)\s*(<div><label style=\{lbl\}>Cat(?:e|é|Ã©)gorie<\/label>)/,
         `$1${cardField}$2`
       );
-      html = html.replace(
-        /(<div><label style=\{lbl\}>Date<\/label><input[\s\S]*?<\/div>)\s*(<div><label style=\{lbl\}>Catégorie<\/label>)/,
-        `$1${cardField}$2`
-      );
     }
+
+    // Older test cache could have inserted two card fields. Keep only the first one.
+    html = html.replace(
+      /(<div(?: data-payment-card-field="true")?><label style=\{lbl\}>Carte utilisee \*<\/label><select[\s\S]*?<\/select><\/div>)\s*(?:<div(?: data-payment-card-field="true")?><label style=\{lbl\}>Carte utilisee \*<\/label><select[\s\S]*?<\/select><\/div>)+/,
+      '$1'
+    );
 
     html = html.replace(
       `const finalNote=[mealNote,form.note].filter(Boolean).join('\\n');`,
