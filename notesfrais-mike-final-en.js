@@ -33,11 +33,16 @@
       ['Toute l’année 2026','Full year 2026'],
       ['Periode','Period'],
       ['Période','Period'],
+      ['Février 2026','February 2026'],
+      ['Après UBS','After UBS'],
+      ['après UBS','after UBS'],
+      ['RÉCONCILIATION UBS','UBS MATCHING'],
+      ['Récupérable','Recoverable'],
+      ['réconciliés','matched'],
       ['Justificatifs','Receipts'],
       ['Reconcilies','Matched'],
       ['Réconciliés','Matched'],
       ['apres UBS','after UBS'],
-      ['après UBS','after UBS'],
       ['Aucune donnee pour cette periode','No data for this period'],
       ['Aucune donnée pour cette période','No data for this period'],
       ['Les statistiques se rempliront avec les frais saisis.','Statistics will fill up as expenses are added.'],
@@ -66,13 +71,19 @@
       ['Statistiques','Stats'],
       ['Accueil','Home'],
       ['Frais','Expenses'],
-      ['PÉRIODE','PERIOD']
+      ['PÉRIODE','PERIOD'],
+      ['Receipt — photo ou PDF','Receipt - photo or PDF'],
+      ['Commerçant *','Merchant *'],
+      ['Catégorie','Category'],
+      ['Hôtel','Hotel'],
+      ['Matériel','Equipment']
     ];
 
     for(const [from,to] of pairs){
       html = html.split(from).join(to);
     }
 
+    html = html.split('/^+ Add expense/').join('/^\\+ Add expense/');
     html = html.replace(/Payment card:\\s\*\(entreprise\|perso\)/g,'Payment card:\\s*(company|personal)');
     html = html.replace(/m\[1\]\.toLowerCase\(\)==='entreprise'\?"Company card":"Personal card"/g,"m[1].toLowerCase()==='company'||m[1].toLowerCase()==='entreprise'?\"Company card\":\"Personal card\"");
     html = html.replace(/form\.paymentCard==='entreprise'\?'Payment card: company':form\.paymentCard==='perso'\?'Payment card: personal':''/g,"form.paymentCard==='entreprise'?'Payment card: company':form.paymentCard==='perso'?'Payment card: personal':''");
