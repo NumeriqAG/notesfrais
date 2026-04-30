@@ -2,7 +2,7 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
+    if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;
     if(html.includes('notesfrais-test-sticky-nav-v2')) return html;
 
     const script = `<script id="notesfrais-test-sticky-nav-v2">(function(){
@@ -31,7 +31,7 @@ function activeTab(){
   return 'home';
 }
 function findAddButton(){
-  return [...document.querySelectorAll('button')].find(b=>/^\\+ Ajouter un frais/.test(textOf(b)));
+  return [...document.querySelectorAll('button')].find(b=>/^\+ Ajouter un frais/.test(textOf(b)));
 }
 function appReady(){return !isLocked()&&!!findAddButton();}
 function modalOpen(){
