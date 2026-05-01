@@ -3,7 +3,7 @@
   "short_name": "NotesFrais",
   "description": "Saisie et suivi des notes de frais de Mike",
   "start_url": "/mike",
-  "scope": "/",
+  "scope": "/mike",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#F5F3EF",
