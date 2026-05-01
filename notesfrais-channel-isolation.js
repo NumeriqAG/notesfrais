@@ -2,12 +2,12 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(html.includes('NOTESFRAIS_CHANNEL_ISOLATION_V2')) return html;
+    if(html.includes('NOTESFRAIS_CHANNEL_ISOLATION_V3')) return html;
 
     html = html.replace(
       "const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);",
-      `const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-const NOTESFRAIS_CHANNEL_ISOLATION_V2=true;
+      String.raw`const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const NOTESFRAIS_CHANNEL_ISOLATION_V3=true;
 const NOTESFRAIS_CHANNEL=window.NOTESFRAIS_CHANNEL||'main';
 const NOTESFRAIS_TEST_TAG='[NF:test]';
 const NOTESFRAIS_META_RE=/\[NF:meta:([A-Za-z0-9_-]+)\]/g;
@@ -23,7 +23,7 @@ function nfBase64Decode(value){
   }catch(e){return '';}
 }
 function buildChannelMeta(channel){
-  const encoded=nfBase64Encode(JSON.stringify({channel:channel,v:2}));
+  const encoded=nfBase64Encode(JSON.stringify({channel:channel,v:3}));
   return encoded?'[NF:meta:'+encoded+']':'';
 }
 function readChannelMeta(note){
@@ -54,7 +54,7 @@ function channelNoteForSave(note){
   if(NOTESFRAIS_CHANNEL==='test'||NOTESFRAIS_CHANNEL==='mike'){
     const meta=buildChannelMeta(NOTESFRAIS_CHANNEL);
     const legacy=NOTESFRAIS_CHANNEL==='test'?NOTESFRAIS_TEST_TAG:'';
-    return [meta,legacy,clean].filter(Boolean).join('\\n').trim();
+    return [meta,legacy,clean].filter(Boolean).join('\n').trim();
   }
   return clean;
 }
@@ -84,7 +84,7 @@ function belongsToNotesFraisChannel(row){
 
     html = html.replace(
       "tx.objectStore(OFFLINE_STORE).add({id:Date.now()+'_'+Math.random().toString(36).slice(2),expense,file:await fileToOffline(file),createdAt:new Date().toISOString()});",
-      "tx.objectStore(OFFLINE_STORE).add({id:Date.now()+'_'+Math.random().toString(36).slice(2),channel:NOTESFRAIS_CHANNEL,expense,file:await fileToOffline(file),createdAt:new Date().toISOString()});"
+      "tx.objectStore(OFFLINE_STORE).add({id:Date.now()+'_'+Math.random().toString(36).slice(2),channel:NOTESFRAIS_CHANNEL,expense:file?expense:expense,file:await fileToOffline(file),createdAt:new Date().toISOString()});"
     );
 
     html = html.replace(
