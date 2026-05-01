@@ -5,6 +5,7 @@
     if(html.includes('function AccessGate('))return html;
     const accessScript=String.raw`
 const ACCESS_CODES={user:'MIKE2026',finance:'FINANCE2026'};
+const NOTESFRAIS_REQUIRE_SUPABASE_AUTH=true;
 function AccessGate({children}){
   const readSession=()=>{try{return JSON.parse(localStorage.getItem('notesfrais_access')||'null');}catch(e){return null;}};
   const [localSession,setLocalSession]=useState(readSession);
@@ -19,6 +20,7 @@ function AccessGate({children}){
   const [busy,setBusy]=useState(false);
 
   useEffect(()=>{
+    if(NOTESFRAIS_REQUIRE_SUPABASE_AUTH){try{localStorage.removeItem('notesfrais_access');}catch(e){}}
     let alive=true;
     sb.auth.getSession().then(({data})=>{if(alive)setAuthSession(data&&data.session?data.session:null);}).finally(()=>{if(alive)setCheckingAuth(false);});
     const {data:{subscription}}=sb.auth.onAuthStateChange((_event,session)=>{setAuthSession(session||null);});
@@ -39,7 +41,8 @@ function AccessGate({children}){
     return()=>{alive=false;};
   },[authSession]);
 
-  const activeRole=profile&&profile.role?profile.role:(localSession&&localSession.role)||null;
+  const localRole=NOTESFRAIS_REQUIRE_SUPABASE_AUTH?null:(localSession&&localSession.role)||null;
+  const activeRole=profile&&profile.role?profile.role:localRole;
   useEffect(()=>{window.notesFraisRole=activeRole||null;window.notesFraisProfile=profile||null;},[activeRole,profile]);
 
   const loginPassword=async()=>{
@@ -55,6 +58,7 @@ function AccessGate({children}){
   };
 
   const unlockCode=()=>{
+    if(NOTESFRAIS_REQUIRE_SUPABASE_AUTH){setError('Connexion par compte requise.');return;}
     const entered=String(code||'').trim().toUpperCase();
     const nextRole=entered===ACCESS_CODES.finance?'finance':entered===ACCESS_CODES.user?'user':null;
     if(!nextRole){setError('Code incorrect.');return;}
@@ -107,12 +111,12 @@ function AccessGate({children}){
         <div style={{fontSize:24,fontWeight:800,letterSpacing:'0.08em'}}>NUMERIQ</div>
       </div>
       <h1 style={{fontSize:22,lineHeight:1.2,marginBottom:6}}>Accès sécurisé</h1>
-      <p style={{fontSize:13,color:'var(--t2)',lineHeight:1.5,marginBottom:16}}>Connectez-vous avec le compte Supabase. Le code local reste disponible temporairement tant que RLS n'est pas activé.</p>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
+      <p style={{fontSize:13,color:'var(--t2)',lineHeight:1.5,marginBottom:16}}>Connectez-vous avec votre compte sécurisé.</p>
+      {!NOTESFRAIS_REQUIRE_SUPABASE_AUTH&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
         <button onClick={()=>{setAuthMode('password');setError('');}} style={{...bS,justifyContent:'center',background:authMode==='password'?'var(--al)':'var(--s2)',color:authMode==='password'?'var(--accent)':'var(--t2)'}}>Compte</button>
         <button onClick={()=>{setAuthMode('code');setError('');}} style={{...bS,justifyContent:'center',background:authMode==='code'?'var(--al)':'var(--s2)',color:authMode==='code'?'var(--accent)':'var(--t2)'}}>Code local</button>
-      </div>
-      {authMode==='password'?<>
+      </div>}
+      {(authMode==='password'||NOTESFRAIS_REQUIRE_SUPABASE_AUTH)?<>
         <input value={email} onChange={e=>{setEmail(e.target.value);setError('');}} type="email" autoComplete="email" placeholder="Email" style={{...inp,fontSize:16,padding:'13px 14px',background:'#fff',marginBottom:10}} />
         <input value={password} onChange={e=>{setPassword(e.target.value);setError('');}} onKeyDown={e=>{if(e.key==='Enter')loginPassword();}} type="password" autoComplete="current-password" placeholder="Mot de passe" style={{...inp,fontSize:16,padding:'13px 14px',background:'#fff',marginBottom:10}} />
         {error&&<div style={{background:'var(--rl)',color:'var(--red)',borderRadius:10,padding:'9px 12px',fontSize:13,marginBottom:10}}>{error}</div>}
@@ -121,7 +125,6 @@ function AccessGate({children}){
         <input value={code} onChange={e=>{setCode(e.target.value);setError('');}} onKeyDown={e=>{if(e.key==='Enter')unlockCode();}} type="password" inputMode="text" autoComplete="current-password" placeholder="Code" style={{...inp,fontSize:18,padding:'14px 15px',background:'#fff',marginBottom:10}} />
         {error&&<div style={{background:'var(--rl)',color:'var(--red)',borderRadius:10,padding:'9px 12px',fontSize:13,marginBottom:10}}>{error}</div>}
         <button onClick={unlockCode} style={{...bP,width:'100%',justifyContent:'center',padding:'14px 18px',fontSize:15}}>Déverrouiller</button>
-        <div style={{fontSize:11,color:'var(--amber)',textAlign:'center',marginTop:12}}>Mode temporaire: ne fonctionnera plus après activation RLS stricte.</div>
       </>}
     </div>
   </div>;
