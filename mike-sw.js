@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notesfrais-mike-shell-v1';
+const CACHE_NAME = 'notesfrais-mike-shell-v2';
 
 const SHELL_FILES = [
   '/mike',
@@ -10,6 +10,7 @@ const SHELL_FILES = [
   '/notesfrais-submit-summary.js',
   '/notesfrais-pwa.js',
   '/notesfrais-storage-secure.js',
+  '/notesfrais-channel-storage.js',
   '/notesfrais-ocr-boost.js',
   '/notesfrais-offline.js',
   '/notesfrais-offline-fixed.js',
