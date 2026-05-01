@@ -3,14 +3,15 @@
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
     if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;
-    if(html.includes('notesfrais-test-sticky-nav-v2')) return html;
+    if(html.includes('notesfrais-test-sticky-nav-v3')) return html;
 
-    const script = `<script id="notesfrais-test-sticky-nav-v2">(function(){
+    const script = `<script id="notesfrais-test-sticky-nav-v3">(function(){
+const IS_MIKE=window.NOTESFRAIS_CHANNEL==='mike';
 function isMobile(){return window.innerWidth<860;}
 function textOf(el){return (el.textContent||'').replace(/\\s+/g,' ').trim();}
 function isLocked(){
   const title=textOf(document.querySelector('h1')||document.body);
-  return /^Code d|^Access code/.test(title);
+  return title.startsWith('Code d')||title.startsWith('Access code');
 }
 function clickNativeNav(target){
   const select=[...document.querySelectorAll('select')].find(s=>[...s.options].some(o=>o.value==='home')&&[...s.options].some(o=>o.value==='recon'));
@@ -19,24 +20,27 @@ function clickNativeNav(target){
     select.dispatchEvent(new Event('change',{bubbles:true}));
     return;
   }
-  const patterns={home:/Accueil/,history:/Historique/,stats:/Statistiques/,recon:/UBS/};
-  const btn=[...document.querySelectorAll('button')].find(b=>patterns[target].test(textOf(b))&&b.id!=='test-scan-cta'&&!b.closest('#test-bottom-nav'));
+  const labels={home:['Accueil','Home'],history:['Historique','Expenses','Frais'],stats:['Statistiques','Stats'],recon:['UBS']};
+  const btn=[...document.querySelectorAll('button')].find(b=>labels[target].some(label=>textOf(b).includes(label))&&b.id!=='test-scan-cta'&&!b.closest('#test-bottom-nav'));
   if(btn)btn.click();
 }
 function activeTab(){
   const title=textOf(document.querySelector('h1')||document.body);
-  if(/Historique/.test(title))return 'history';
-  if(/Statistiques/.test(title))return 'stats';
-  if(/UBS/.test(title))return 'recon';
+  if(title.includes('Historique')||title.includes('Expenses'))return 'history';
+  if(title.includes('Statistiques')||title.includes('Stats'))return 'stats';
+  if(title.includes('UBS'))return 'recon';
   return 'home';
 }
 function findAddButton(){
-  return [...document.querySelectorAll('button')].find(b=>/^\+ Ajouter un frais/.test(textOf(b)));
+  return [...document.querySelectorAll('button')].find(b=>{
+    const text=textOf(b);
+    return text.startsWith('+ Ajouter un frais')||text.startsWith('+ Add expense');
+  });
 }
 function appReady(){return !isLocked()&&!!findAddButton();}
 function modalOpen(){
-  return [...document.querySelectorAll('button')].some(b=>/^Confirmer$|Upload en cours|Annuler$/.test(textOf(b)))
-    || [...document.querySelectorAll('div')].some(el=>/^Ajouter un frais$/.test(textOf(el)));
+  return [...document.querySelectorAll('button')].some(b=>['Confirmer','Confirm','Uploading','Upload en cours','Annuler','Cancel'].some(label=>textOf(b).includes(label)))
+    || [...document.querySelectorAll('div')].some(el=>['Ajouter un frais','Add expense'].includes(textOf(el)));
 }
 function ensureStyle(){
   if(document.getElementById('test-sticky-nav-style'))return;
@@ -56,7 +60,7 @@ function ensureBottomNav(){
   if(!nav){
     nav=document.createElement('div');
     nav.id='test-bottom-nav';
-    const items=[['home','Accueil'],['history','Frais'],['stats','Stats'],['recon','UBS']];
+    const items=IS_MIKE?[['home','Home'],['history','Expenses'],['stats','Stats'],['recon','UBS']]:[['home','Accueil'],['history','Frais'],['stats','Stats'],['recon','UBS']];
     items.forEach(([id,label])=>{
       const b=document.createElement('button');
       b.type='button';
@@ -77,7 +81,7 @@ function ensureScanCta(){
     cta=document.createElement('button');
     cta.id='test-scan-cta';
     cta.type='button';
-    cta.textContent='Scanner un recu';
+    cta.textContent=IS_MIKE?'Scan receipt':'Scanner un reçu';
     cta.addEventListener('click',()=>{const add=findAddButton();if(add)add.click();});
     document.body.appendChild(cta);
   }
