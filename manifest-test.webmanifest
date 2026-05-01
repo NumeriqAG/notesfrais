@@ -3,7 +3,7 @@
   "short_name": "NF Test",
   "description": "Pre-production NotesFrais",
   "start_url": "/test",
-  "scope": "/",
+  "scope": "/test",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#F5F3EF",
