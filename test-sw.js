@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notesfrais-test-shell-v13';
+const CACHE_NAME = 'notesfrais-test-shell-v14';
 
 const SHELL_FILES = [
   '/test',
