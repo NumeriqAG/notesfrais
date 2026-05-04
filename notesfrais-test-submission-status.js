@@ -17,9 +17,9 @@ function getMonthSubmissionStatus(month,items){
   return month<getCurrentNotesFraisMonthKey()?'to_submit':'pending';
 }
 function submissionStatusMeta(status){
-  if(status==='submitted')return{label:'Soumis',hint:'Envoyé à la finance',bg:'var(--gl)',color:'var(--green)',icon:'✓'};
-  if(status==='to_submit')return{label:'À soumettre',hint:'Mois terminé, en attente d’envoi',bg:'var(--aml)',color:'var(--amber)',icon:'!'};
-  return{label:'En cours',hint:'Mike complète encore ce mois',bg:'var(--al)',color:'var(--accent)',icon:'•'};
+  if(status==='submitted')return{label:'Soumis',hint:'Envoye a la finance',bg:'var(--gl)',color:'var(--green)',icon:'✓'};
+  if(status==='to_submit')return{label:'A soumettre',hint:'Mois termine, en attente d envoi',bg:'var(--aml)',color:'var(--amber)',icon:'!'};
+  return{label:'En cours',hint:'Mike complete encore ce mois',bg:'var(--al)',color:'var(--accent)',icon:'•'};
 }
 `;
 
@@ -45,7 +45,7 @@ function submissionStatusMeta(status){
       const submittedAt=new Date().toISOString();
       const{error}=await sb.from('expenses')
         .update({submission_status:'submitted',submitted_at:submittedAt})
-        .gte('date',`${month}-01`)
+        .gte('date',month+'-01')
         .lte('date',lastDayOfMonth(month))
         .eq('app_channel',currentNotesFraisChannel());
       if(error)throw error;
