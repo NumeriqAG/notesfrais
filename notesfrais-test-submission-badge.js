@@ -3,10 +3,10 @@
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
     if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
-    if(html.includes('NOTESFRAIS_SUBMISSION_BADGE_TEST_V1')) return html;
+    if(html.includes('NOTESFRAIS_SUBMISSION_BADGE_TEST_V2')) return html;
 
     const helpers = String.raw`
-const NOTESFRAIS_SUBMISSION_BADGE_TEST_V1=true;
+const NOTESFRAIS_SUBMISSION_BADGE_TEST_V2=true;
 function getCurrentSubmissionMonthKey(){
   const now=new Date();
   return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
@@ -32,12 +32,46 @@ function getSubmissionStatusBadge(status){
 
     html = html.replace(
       "const pct=mE.length>0?Math.round(rec.length/mE.length*100):0;",
-      "const pct=mE.length>0?Math.round(rec.length/mE.length*100):0;\n  const submissionBadge=getSubmissionStatusBadge(getSubmissionStatusForMonth(month,mE));"
+      "const pct=mE.length>0?Math.round(rec.length/mE.length*100):0;\n  const submissionStatus=getSubmissionStatusForMonth(month,mE);\n  const submissionBadge=getSubmissionStatusBadge(submissionStatus);"
+    );
+
+    html = html.replace(
+      "const deleteExpense=useCallback(async(id,receiptPath)=>{try{await deleteById(id,receiptPath);setExpenses(p=>p.filter(e=>e.id!==id));notify('🗑 Frais supprimé');}catch(e){notify('❌ Erreur: '+e.message);}},[]);",
+      String.raw`const deleteExpense=useCallback(async(id,receiptPath)=>{try{await deleteById(id,receiptPath);setExpenses(p=>p.filter(e=>e.id!==id));notify('🗑 Frais supprimé');}catch(e){notify('❌ Erreur: '+e.message);}},[]);
+  const submitCurrentMonth=useCallback(async()=>{
+    if(mE.length===0||syncing)return;
+    setSyncing(true);
+    try{
+      const submittedAt=new Date().toISOString();
+      const monthEnd=lastDayOfMonth(month);
+      const payload={submission_status:'submitted',submitted_at:submittedAt};
+      const{error}=await sb.from('expenses')
+        .update(payload)
+        .gte('date',month+'-01')
+        .lte('date',monthEnd)
+        .eq('app_channel',currentNotesFraisChannel());
+      if(error)throw error;
+      setExpenses(prev=>prev.map(exp=>exp.date&&exp.date.startsWith(month)?{...exp,submissionStatus:'submitted',submittedAt}:exp));
+      setShowSubmitSummary(false);
+      setSubmitted(true);
+      notify('📨 Frais soumis a la finance');
+      setTimeout(()=>setSubmitted(false),3000);
+    }catch(e){
+      notify('❌ Soumission impossible: '+(e.message||e));
+    }finally{
+      setSyncing(false);
+    }
+  },[month,mE.length,syncing]);`
     );
 
     html = html.replace(
       "<div style={{fontSize:13,color:'var(--t3)'}}>Tableau de bord des frais professionnels</div>",
       "<div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div><div style={{fontSize:13,color:'var(--t3)'}}>Tableau de bord des frais professionnels</div></div><div style={{display:'inline-flex',alignItems:'center',gap:7,background:submissionBadge.bg,color:submissionBadge.color,border:'0.5px solid '+submissionBadge.border,borderRadius:999,padding:'7px 11px',fontSize:12,fontWeight:800,whiteSpace:'nowrap'}}><span>{submissionBadge.label}</span><span style={{fontWeight:500,opacity:0.75}}>· {submissionBadge.hint}</span></div></div>"
+    );
+
+    html = html.replace(
+      "<button disabled={mE.length===0} onClick={()=>{setShowSubmitSummary(false);setSubmitted(true);notify('📧 Frais soumis au service RH !');setTimeout(()=>setSubmitted(false),3000);}} style={{...bP,justifyContent:'center',opacity:mE.length===0?0.55:1}}>Confirmer la soumission</button>",
+      "<button disabled={mE.length===0||syncing||submissionStatus==='submitted'} onClick={submitCurrentMonth} style={{...bP,justifyContent:'center',opacity:(mE.length===0||syncing||submissionStatus==='submitted')?0.55:1}}>{submissionStatus==='submitted'?'Déjà soumis':syncing?'Soumission...':'Confirmer la soumission'}</button>"
     );
 
     return html;
