@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notesfrais-test-shell-v19';
+const CACHE_NAME = 'notesfrais-test-shell-v20';
 
 const SHELL_FILES = [
   '/test',
@@ -35,6 +35,7 @@ const SHELL_FILES = [
   '/notesfrais-test-sticky-nav.js',
   '/notesfrais-test-modal-fix.js',
   '/notesfrais-test-period-inside-tabs.js',
+  '/notesfrais-test-user-expenses.js',
   '/notesfrais-test-compress.js'
 ];
 
