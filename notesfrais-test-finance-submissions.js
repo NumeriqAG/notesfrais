@@ -3,9 +3,9 @@
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
     if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
-    if(html.includes('NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V4')) return html;
+    if(html.includes('NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V5')) return html;
 
-    html = html.replace('function App(){', 'const NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V4=true;\nfunction App(){');
+    html = html.replace('function App(){', 'const NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V5=true;\nfunction App(){');
 
     html = html.replace(
       "return{...m,list,total,tva,withReceipt,missingReceipt,reconciled,status};",
@@ -42,10 +42,7 @@
       "function FinanceExpensesTab({mE,fil,rec,pend,mT,tva,pct,bycat,isMobile,filterCat,setFilterCat,search,setSearch,setShowAdd,setShowSubmitSummary,submitted,deleteExpense,setViewer,month,setMonth,periodMode,setPeriodMode,periodFrom,setPeriodFrom,periodTo,setPeriodTo,monthCounts,ML,setTab}){"
     );
 
-    html = html.replace(
-      "monthCounts={monthCounts} ML={ML}/>}\n        {tab==='settings'",
-      "monthCounts={monthCounts} ML={ML} setTab={setTab}/>}\n        {tab==='settings'"
-    );
+    html = html.replace(/monthCounts=\{monthCounts\} ML=\{ML\}\/>(?=\})/, "monthCounts={monthCounts} ML={ML} setTab={setTab}/>");
 
     html = html.replace(
       "const cardRows=Object.entries(cardTotals).sort((a,b)=>b[1]-a[1]);\n  const canSubmit=periodMode==='month'&&mE.length>0;\n  return <div style={{maxWidth:1040,paddingBottom:isMobile?180:40}}>",
