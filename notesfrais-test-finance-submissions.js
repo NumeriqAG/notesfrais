@@ -3,9 +3,9 @@
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
     if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
-    if(html.includes('NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V3')) return html;
+    if(html.includes('NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V4')) return html;
 
-    html = html.replace('function App(){', 'const NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V3=true;\nfunction App(){');
+    html = html.replace('function App(){', 'const NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V4=true;\nfunction App(){');
 
     html = html.replace(
       "return{...m,list,total,tva,withReceipt,missingReceipt,reconciled,status};",
@@ -43,8 +43,8 @@
     );
 
     html = html.replace(
-      "monthCounts={monthCounts} ML={ML}/>}",
-      "monthCounts={monthCounts} ML={ML} setTab={setTab}/>}
+      "monthCounts={monthCounts} ML={ML}/>}\n        {tab==='settings'",
+      "monthCounts={monthCounts} ML={ML} setTab={setTab}/>}\n        {tab==='settings'"
     );
 
     html = html.replace(
