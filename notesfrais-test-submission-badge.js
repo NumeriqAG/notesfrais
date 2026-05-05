@@ -3,10 +3,10 @@
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
     if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
-    if(html.includes('NOTESFRAIS_SUBMISSION_BADGE_TEST_V4')) return html;
+    if(html.includes('NOTESFRAIS_SUBMISSION_BADGE_TEST_V5')) return html;
 
     const helpers = String.raw`
-const NOTESFRAIS_SUBMISSION_BADGE_TEST_V4=true;
+const NOTESFRAIS_SUBMISSION_BADGE_TEST_V5=true;
 function getCurrentSubmissionMonthKey(){
   const now=new Date();
   return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
@@ -37,16 +37,16 @@ function getSubmissionStatusBadge(status){
   const submissionBadge=getSubmissionStatusBadge(submissionStatus);
   const submitCurrentMonth=async()=>{
     if(mE.length===0||syncing||submissionStatus==='submitted')return;
+    const ids=mE.map(e=>e.id).filter(Boolean);
+    if(ids.length===0){notify('Aucun frais synchronise a soumettre');return;}
     setSyncing(true);
     try{
       const submittedAt=new Date().toISOString();
       const{error}=await sb.from('expenses')
         .update({submission_status:'submitted',submitted_at:submittedAt})
-        .gte('date',month+'-01')
-        .lte('date',lastDayOfMonth(month))
-        .eq('app_channel',currentNotesFraisChannel());
+        .in('id',ids);
       if(error)throw error;
-      setExpenses(prev=>prev.map(exp=>exp.date&&exp.date.startsWith(month)?{...exp,submissionStatus:'submitted',submittedAt}:exp));
+      setExpenses(prev=>prev.map(exp=>ids.includes(exp.id)?{...exp,submissionStatus:'submitted',submittedAt}:exp));
       setShowSubmitSummary(false);
       setSubmitted(true);
       notify('📨 Frais soumis a la finance');
