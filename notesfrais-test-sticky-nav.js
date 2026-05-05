@@ -3,9 +3,9 @@
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
     if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;
-    if(html.includes('notesfrais-test-sticky-nav-v4')) return html;
+    if(html.includes('notesfrais-test-sticky-nav-v5')) return html;
 
-    const script = `<script id="notesfrais-test-sticky-nav-v4">(function(){
+    const script = `<script id="notesfrais-test-sticky-nav-v5">(function(){
 const IS_MIKE=window.NOTESFRAIS_CHANNEL==='mike';
 const IS_TEST=window.NOTESFRAIS_CHANNEL==='test';
 function isMobile(){return window.innerWidth<860;}
@@ -41,10 +41,10 @@ function activeTab(){
   const title=textOf(document.querySelector('h1')||document.body);
   if(title.includes('Finance'))return 'finance';
   if(title.includes('Paramètres')||title.includes('Settings'))return 'settings';
-  if(title.includes('Frais')||title.includes('Historique')||title.includes('Expenses'))return IS_TEST&&!isFinance()?'expenses':'history';
+  if(title.includes('Frais')||title.includes('Historique')||title.includes('Expenses'))return !isFinance()?'expenses':'history';
   if(title.includes('Statistiques')||title.includes('Stats'))return 'stats';
   if(title.includes('UBS'))return 'recon';
-  return IS_TEST&&!isFinance()?'expenses':'home';
+  return !isFinance()?'expenses':'home';
 }
 function findAddButton(){
   return [...document.querySelectorAll('button')].find(b=>{
@@ -71,9 +71,8 @@ function hideFloating(){
   if(cta)cta.style.display='none';
 }
 function navItems(){
-  if(IS_MIKE)return [['home','Home'],['history','Expenses'],['stats','Stats'],['recon','UBS']];
   if(isFinance())return [['finance','Finance'],['finance_expenses','Frais'],['stats','Stats'],['recon','UBS'],['settings','Paramètres']];
-  return [['expenses','Frais'],['stats','Stats'],['recon','UBS']];
+  return [['expenses',IS_MIKE?'Expenses':'Frais'],['stats','Stats'],['recon','UBS']];
 }
 function ensureBottomNav(){
   const items=navItems();
