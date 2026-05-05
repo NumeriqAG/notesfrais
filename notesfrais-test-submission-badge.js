@@ -3,10 +3,10 @@
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
     if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
-    if(html.includes('NOTESFRAIS_SUBMISSION_BADGE_TEST_V5')) return html;
+    if(html.includes('NOTESFRAIS_SUBMISSION_BADGE_TEST_V6')) return html;
 
     const helpers = String.raw`
-const NOTESFRAIS_SUBMISSION_BADGE_TEST_V5=true;
+const NOTESFRAIS_SUBMISSION_BADGE_TEST_V6=true;
 function getCurrentSubmissionMonthKey(){
   const now=new Date();
   return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
@@ -20,6 +20,27 @@ function getSubmissionStatusBadge(status){
   if(status==='submitted')return{label:'Soumis',hint:'envoye a la finance',bg:'var(--gl)',color:'var(--green)',border:'#BDEAD9'};
   if(status==='to_submit')return{label:'A soumettre',hint:'mois termine',bg:'var(--aml)',color:'var(--amber)',border:'#F0D391'};
   return{label:'En cours',hint:'saisie en cours',bg:'var(--al)',color:'var(--accent)',border:'#C7D5FF'};
+}
+function titleCaseName(value){
+  return String(value||'').replace(/[._-]+/g,' ').trim().split(/\s+/).filter(Boolean).map(part=>part.charAt(0).toUpperCase()+part.slice(1).toLowerCase()).join(' ');
+}
+async function getSubmissionUserIdentity(){
+  try{
+    const {data}=await sb.auth.getUser();
+    const user=data&&data.user?data.user:null;
+    const meta=user&&user.user_metadata?user.user_metadata:{};
+    const email=user&&user.email?user.email:'';
+    const name=meta.full_name||meta.name||meta.display_name||titleCaseName(String(email).split('@')[0])||'Utilisateur';
+    return {userName:name,userEmail:email};
+  }catch(e){
+    return {userName:'Utilisateur',userEmail:''};
+  }
+}
+async function notifyFinanceSubmission(payload){
+  const response=await fetch('/api/notify-submission',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data.ok===false)throw new Error(data.error||'Notification email impossible');
+  return data;
 }
 `;
 
@@ -50,6 +71,20 @@ function getSubmissionStatusBadge(status){
       setShowSubmitSummary(false);
       setSubmitted(true);
       notify('📨 Frais soumis a la finance');
+      try{
+        const identity=await getSubmissionUserIdentity();
+        const mail=await notifyFinanceSubmission({
+          ...identity,
+          month,
+          monthLabel:ML,
+          expenseCount:mE.length,
+          totalCHF:mT,
+          submittedAt
+        });
+        if(mail&&mail.skipped)notify('📨 Frais soumis. Email non envoye: configuration mail manquante.',6500);
+      }catch(mailError){
+        notify('⚠ Frais soumis, mais email non envoye: '+(mailError.message||mailError),6500);
+      }
       setTimeout(()=>setSubmitted(false),3000);
     }catch(e){
       notify('❌ Soumission impossible: '+(e.message||e));
