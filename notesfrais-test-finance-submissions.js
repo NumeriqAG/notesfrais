@@ -3,9 +3,9 @@
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
     if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
-    if(html.includes('NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V1')) return html;
+    if(html.includes('NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V2')) return html;
 
-    html = html.replace('function App(){', 'const NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V1=true;\nfunction App(){');
+    html = html.replace('function App(){', 'const NOTESFRAIS_FINANCE_SUBMISSIONS_TEST_V2=true;\nfunction App(){');
 
     html = html.replace(
       "return{...m,list,total,tva,withReceipt,missingReceipt,reconciled,status};",
@@ -14,7 +14,7 @@
 
     html = html.replace(
       "const openMonth=(m)=>{setMonth(m);setTab('home');};",
-      "const openMonth=(m)=>{setMonth(m);setPeriodMode&&setPeriodMode('month');setTab('finance_expenses');};"
+      "const openMonth=(m)=>{setMonth(m);if(typeof setPeriodMode==='function')setPeriodMode('month');setTab('finance_expenses');};"
     );
 
     html = html.replace(
@@ -35,6 +35,16 @@
     html = html.replace(
       "<FinanceDashboardTab expenses={expenses} months={MONTHS} setMonth={setMonth} setTab={setTab}/>",
       "<FinanceDashboardTab expenses={expenses} months={MONTHS} setMonth={setMonth} setTab={setTab} setPeriodMode={setPeriodMode}/>"
+    );
+
+    html = html.replace(
+      "function FinanceExpensesTab({mE,fil,rec,pend,mT,tva,pct,bycat,isMobile,filterCat,setFilterCat,search,setSearch,setShowAdd,setShowSubmitSummary,submitted,deleteExpense,setViewer,month,setMonth,periodMode,setPeriodMode,periodFrom,setPeriodFrom,periodTo,setPeriodTo,monthCounts,ML}){",
+      "function FinanceExpensesTab({mE,fil,rec,pend,mT,tva,pct,bycat,isMobile,filterCat,setFilterCat,search,setSearch,setShowAdd,setShowSubmitSummary,submitted,deleteExpense,setViewer,month,setMonth,periodMode,setPeriodMode,periodFrom,setPeriodFrom,periodTo,setPeriodTo,monthCounts,ML,setTab}){"
+    );
+
+    html = html.replace(
+      "monthCounts={monthCounts} ML={ML}/>}\\n        {tab==='settings'",
+      "monthCounts={monthCounts} ML={ML} setTab={setTab}/>}\\n        {tab==='settings'"
     );
 
     html = html.replace(
