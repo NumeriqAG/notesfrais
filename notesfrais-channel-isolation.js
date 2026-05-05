@@ -2,12 +2,12 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(html.includes('NOTESFRAIS_CHANNEL_ISOLATION_V4')) return html;
+    if(html.includes('NOTESFRAIS_CHANNEL_ISOLATION_V5')) return html;
 
     html = html.replace(
       "const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);",
       String.raw`const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-const NOTESFRAIS_CHANNEL_ISOLATION_V4=true;
+const NOTESFRAIS_CHANNEL_ISOLATION_V5=true;
 const NOTESFRAIS_CHANNEL=window.NOTESFRAIS_CHANNEL||'main';
 const NOTESFRAIS_TEST_TAG='[NF:test]';
 const NOTESFRAIS_META_RE=/\[NF:meta:([A-Za-z0-9_-]+)\]/g;
@@ -23,7 +23,7 @@ function nfBase64Decode(value){
   }catch(e){return '';}
 }
 function buildChannelMeta(channel){
-  const encoded=nfBase64Encode(JSON.stringify({channel:channel,v:4}));
+  const encoded=nfBase64Encode(JSON.stringify({channel:channel,v:5}));
   return encoded?'[NF:meta:'+encoded+']':'';
 }
 function readChannelMeta(note){
@@ -43,12 +43,19 @@ function stripChannelMarkers(note){
 }
 function hasTestTag(note){return String(note||'').includes(NOTESFRAIS_TEST_TAG);}
 function currentNotesFraisChannel(){return NOTESFRAIS_CHANNEL==='test'||NOTESFRAIS_CHANNEL==='mike'?NOTESFRAIS_CHANNEL:'mike';}
+function writeAppChannelForSave(){
+  const profile=window.notesFraisProfile||null;
+  const role=window.notesFraisRole||null;
+  const profileChannel=profile&&typeof profile.app_channel==='string'&&profile.app_channel?profile.app_channel:null;
+  if(role==='user'&&profileChannel)return profileChannel;
+  return currentNotesFraisChannel();
+}
 function channelForRow(row){
-  if(row&&typeof row.app_channel==='string'&&row.app_channel)return row.app_channel;
   const note=String(row&&row.note||'');
   const meta=readChannelMeta(note);
   if(meta&&meta.channel)return meta.channel;
   if(hasTestTag(note))return 'test';
+  if(row&&typeof row.app_channel==='string'&&row.app_channel)return row.app_channel;
   return 'mike';
 }
 function channelNoteForSave(note){
@@ -80,7 +87,7 @@ function isMissingAppChannelError(error){
 
     html = html.replace(
       "note:e.note||''",
-      "app_channel:currentNotesFraisChannel(),note:channelNoteForSave(e.note)"
+      "app_channel:writeAppChannelForSave(),note:channelNoteForSave(e.note)"
     );
 
     html = html.replace(
