@@ -3,10 +3,10 @@
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
     if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
-    if(html.includes('NOTESFRAIS_USER_EXPENSES_TEST_V1')) return html;
+    if(html.includes('NOTESFRAIS_USER_EXPENSES_TEST_V2')) return html;
 
     const component = String.raw`
-const NOTESFRAIS_USER_EXPENSES_TEST_V1=true;
+const NOTESFRAIS_USER_EXPENSES_TEST_V2=true;
 function UserExpensesTab({mE,fil,rec,pend,mT,tva,pct,bycat,isMobile,filterCat,setFilterCat,search,setSearch,setShowAdd,setShowSubmitSummary,submitted,deleteExpense,setViewer,month,setMonth,periodMode,setPeriodMode,periodFrom,setPeriodFrom,periodTo,setPeriodTo,monthCounts,ML,submissionBadge}){
   const receiptCount=fil.filter(e=>e.receiptPath||e.receiptUrl).length;
   const missingReceipt=mE.length-mE.filter(e=>e.receiptPath||e.receiptUrl).length;
@@ -65,7 +65,14 @@ function UserExpensesTab({mE,fil,rec,pend,mT,tva,pct,bycat,isMobile,filterCat,se
 
     html = html.replace(
       "{tab==='home'&&<div",
-      "{tab==='expenses'&&window.notesFraisRole!=='finance'&&<UserExpensesTab mE={mE} fil={fil} rec={rec} pend={pend} mT={mT} tva={tva} pct={pct} bycat={bycat} isMobile={isMobile} filterCat={filterCat} setFilterCat={setFilterCat} search={search} setSearch={setSearch} setShowAdd={setShowAdd} setShowSubmitSummary={setShowSubmitSummary} submitted={submitted} deleteExpense={deleteExpense} setViewer={setViewer} month={month} setMonth={setMonth} periodMode={periodMode} setPeriodMode={setPeriodMode} periodFrom={periodFrom} setPeriodFrom={setPeriodFrom} periodTo={periodTo} setPeriodTo={setPeriodTo} monthCounts={monthCounts} ML={ML} submissionBadge={submissionBadge}/>}\n\n        {tab==='home'&&<div"
+      "{tab==='expenses'&&window.notesFraisRole!=='finance'&&<UserExpensesTab mE={mE} fil={fil} rec={rec} pend={pend} mT={mT} tva={tva} pct={pct} bycat={bycat} isMobile={isMobile} filterCat={filterCat} setFilterCat={setFilterCat} search={search} setSearch={setSearch} setShowAdd={setShowAdd} setShowSubmitSummary={setShowSubmitSummary} submitted={submitted} deleteExpense={deleteExpense} setViewer={setViewer} month={month} setMonth={setMonth} periodMode={periodMode} setPeriodMode={setPeriodMode} periodFrom={periodFrom} setPeriodFrom={setPeriodFrom} periodTo={periodTo} setPeriodTo={setPeriodTo} monthCounts={monthCounts} ML={ML} submissionBadge={submissionBadge}/>}
+
+        {tab==='home'&&<div"
+    );
+
+    html = html.replace(
+      "<div style={{padding:'12px'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.08em',padding:'0 8px',marginBottom:6}}>NAVIGATION</div>{isMobile?",
+      "<div style={{padding:'12px',display:isMobile&&window.notesFraisRole!=='finance'?'none':'block'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.08em',padding:'0 8px',marginBottom:6}}>NAVIGATION</div>{isMobile?"
     );
 
     return html;
