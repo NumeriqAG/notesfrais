@@ -3,9 +3,9 @@
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
     if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
-    if(html.includes('NOTESFRAIS_USER_EXPENSES_TEST_V4')) return html;
+    if(html.includes('NOTESFRAIS_USER_EXPENSES_TEST_V5')) return html;
 
-    html = html.replace('function App(){', 'const NOTESFRAIS_USER_EXPENSES_TEST_V4=true;\nfunction App(){');
+    html = html.replace('function App(){', 'const NOTESFRAIS_USER_EXPENSES_TEST_V5=true;\nfunction App(){');
 
     html = html.replace(
       "const [tab,setTab]=useState(()=>window.notesFraisRole==='finance'?'finance':'home');",
@@ -27,12 +27,16 @@
     );
 
     html = html.replace(
+      "{tab==='home'&&<div",
+      "{(tab==='home'||(tab==='expenses'&&window.notesFraisRole!=='finance'))&&<div"
+    );
+    html = html.replace(
       "{tab==='history'&&<div",
       "{(tab==='history'||(tab==='expenses'&&window.notesFraisRole!=='finance'))&&<div"
     );
     html = html.replace(
       "<h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Historique</h1>",
-      "<h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>{tab==='expenses'?'Frais':'Historique'}</h1>"
+      "<h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>{tab==='expenses'?'Liste des frais':'Historique'}</h1>"
     );
 
     html = html.replace(
