@@ -129,6 +129,8 @@ tous les marqueurs fonctionnels au vert, mais fait échouer la baseline sur
 | `tools/check-patches.js` | Harnais : rejoue la chaîne, liste les `replace()` sans effet. |
 | `tools/test-patches.js` | Tests anti-régression. À lancer avant chaque commit. |
 | `tools/patch-baseline.json` | Baseline des no-op et du mojibake connus. |
+| `tools/audit-rls.sql` | Audit de sécurité, à coller dans le SQL Editor Supabase. |
+| `tools/probe-anon.sh` | Ce qu'un visiteur non authentifié obtient réellement. |
 | `icon.svg`, `logo-numeriq-payroll.png` | Assets. |
 
 ---
@@ -184,7 +186,16 @@ bucket ; les policies les traitent via `coalesce(folder,'mike')`.
 `supabase-add-app-channel.sql` → `supabase-add-submission-status.sql` →
 `supabase-auth-rls.sql`.
 ⚠ `supabase-auth-rls.sql` contient encore les placeholders
-`MIKE_EMAIL_A_REMPLACER` / `FINANCE_EMAIL_A_REMPLACER`.
+`MIKE_EMAIL_A_REMPLACER` / `FINANCE_EMAIL_A_REMPLACER`. **Le SQL réellement
+appliqué en production n'est donc pas dans le dépôt**, et rien dans le code ne
+permet de savoir ce qui est appliqué.
+
+Avant toute intervention touchant aux droits, lancer `tools/audit-rls.sql`
+dans le SQL Editor : en une requête il dit si RLS est actif sur `expenses` et
+`app_profiles`, si le bucket `receipts` est bien privé (l'app suppose que
+oui — elle crée des URLs signées), quelles policies existent réellement, et
+quels comptes ont une ligne dans `app_profiles`. `tools/probe-anon.sh` en
+donne la contrepartie empirique depuis une machine connectée.
 
 ### Auth
 `notesfrais-access.js` injecte un composant `AccessGate` qui enveloppe
