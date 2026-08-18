@@ -130,6 +130,10 @@ const REQUIRED = {
     ['OCR avec pretraitement image', 'function preprocessReceiptImage('],
     ['brouillon du formulaire', 'NOTESFRAIS_DRAFT_KEY'],
     ['modale de resume avant soumission', 'showSubmitSummary'],
+    ['confirmation avant suppression : handlers', 'NOTESFRAIS_DELETE_CONFIRM_V1'],
+    ['confirmation avant suppression : etat', 'const [pendingDelete,setPendingDelete]=useState(null);'],
+    ['confirmation avant suppression : modale', 'data-nf-delete-confirm'],
+    ['suppression jamais immediate', 'const deleteExpense=useCallback((id,receiptPath)=>{setPendingDelete'],
   ],
   mike: [
     ['isolation de canal', 'NOTESFRAIS_CHANNEL_ISOLATION_V5'],
@@ -214,6 +218,44 @@ if (UPDATE) {
     worseEnc.concat('un fichier a ete sauve deux fois en UTF-8 : ses chaines cibles accentuees ne matcheront plus').join('\n'));
 }
 
-/* --- resultat ---------------------------------------------------------- */
-console.log(`\n${failures === 0 ? 'OK' : 'ECHEC'} — ${checks - failures}/${checks} verifications passees`);
-process.exit(failures === 0 ? 0 : 1);
+/* --- 5. compilation JSX reelle ----------------------------------------- */
+// La verification la plus forte du depot : un patch qui produit du JSX invalide
+// rend l'application entierement blanche. On compile avec la version exacte de
+// Babel Standalone chargee en production. Le bundle (2,8 Mo) n'est pas versionne
+// — il est telecharge une fois et mis en cache dans .patch-out/, et le test est
+// simplement saute si le reseau n'est pas disponible.
+section('5. Compilation du JSX genere');
+
+const BABEL_URL = 'https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.10/babel.min.js';
+const BABEL_CACHE = path.join(ROOT, '.patch-out', 'babel.min.js');
+
+(async () => {
+  let Babel = null;
+  try {
+    if (!fs.existsSync(BABEL_CACHE)) {
+      const res = await fetch(BABEL_URL);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      fs.mkdirSync(path.dirname(BABEL_CACHE), { recursive: true });
+      fs.writeFileSync(BABEL_CACHE, Buffer.from(await res.arrayBuffer()));
+    }
+    Babel = require(BABEL_CACHE);
+  } catch (e) {
+    console.log(`  saute  Babel indisponible (${e.message}) — compilation non verifiee`);
+  }
+
+  if (Babel) {
+    for (const channel of Object.keys(CHANNELS)) {
+      const m = built[channel].html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/);
+      if (!m) { fail(`${channel} : script Babel present`); continue; }
+      try {
+        Babel.transform(m[1], { presets: ['react', 'env'], filename: channel + '.jsx' });
+        ok(`${channel} : le JSX genere compile (${m[1].length} caracteres)`);
+      } catch (e) {
+        fail(`${channel} : le JSX genere compile`, e.message.split('\n').slice(0, 3).join('\n'));
+      }
+    }
+  }
+
+  console.log(`\n${failures === 0 ? 'OK' : 'ECHEC'} — ${checks - failures}/${checks} verifications passees`);
+  process.exit(failures === 0 ? 0 : 1);
+})();

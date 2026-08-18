@@ -100,6 +100,12 @@ C'est le seul filet de sécurité du repo. Il vérifie :
 4. **Baseline** (`tools/patch-baseline.json`) — le nombre de `replace()` sans
    effet **par fichier et par canal** ne doit jamais augmenter, ni le nombre de
    séquences mojibake par fichier.
+5. **Compilation JSX** — le script généré est réellement compilé avec la version
+   exacte de Babel Standalone chargée en production. C'est la vérification la
+   plus forte du dépôt : un patch qui produit du JSX invalide rend l'application
+   entièrement blanche. Le bundle (2,8 Mo) n'est pas versionné — il est
+   téléchargé une fois dans `.patch-out/`, et le test est sauté sans échouer si
+   le réseau est absent.
 
 Le point 4 est celui qui attrape la panne caractéristique du projet. Exemple
 réel : ajouter une espace dans une chaîne cible de `test-compress.js` laisse
@@ -262,7 +268,8 @@ Ordre de chargement de `mike.html` (le canal test est identique moins
 | 29 | `test-period-inside-tabs.js` | **Étend `MONTHS` aux 12 mois de 2026** + sélecteur de période Mois / Plage / Toute l'année dans chaque onglet. |
 | 30 | `test-compress.js` | Compresse la photo (max 1800 px, JPEG q .78) avant OCR et upload. |
 | 31 | `test-finance-submissions.js` | Vue finance des mois soumis. |
-| 32-33 | `mike-en.js`, `mike-final-en.js` | Traduction FR → EN de tout le HTML final, par `split()/join()` de paires. **Chargés en dernier** : tout libellé français ajouté par un patch antérieur doit avoir sa paire ici. |
+| 32-33 | `mike-en.js`, `mike-final-en.js` | Traduction FR → EN de tout le HTML final, par `split()/join()` de paires. Tout libellé français ajouté par un patch **antérieur** doit avoir sa paire ici. |
+| 34 | `delete-confirm.js` | Boîte de confirmation avant suppression d'un frais. `deleteExpense` n'efface plus : il ouvre la modale, donc **tous les appelants sont couverts, présents et futurs**. Chargé **après** les traductions, il porte donc ses deux langues lui-même. |
 
 Le test suite refuse tout `notesfrais-*.js` présent sur le disque et chargé par
 aucune page — donc pas de fichier orphelin qui traîne.
@@ -323,6 +330,15 @@ aucune page — donc pas de fichier orphelin qui traîne.
      document généré : sur `/mike` la globale ne porte pas ce nom ;
    - les constantes en MAJUSCULES (`NOTESFRAIS_*`) ne sont pas touchées — s'en
      servir pour tout ce qui doit rester stable entre canaux.
+
+   Deux emplacements possibles pour un nouveau patch, à choisir consciemment :
+   **avant** les traductions, et il faut alors ajouter ses paires dans
+   `mike-final-en.js` ; ou **après**, et le patch porte lui-même ses deux
+   langues via `window.NOTESFRAIS_CHANNEL==='mike'` (c'est ce que font
+   `meal-context.js` et `delete-confirm.js`). La seconde voie est plus sûre
+   pour tout texte neuf. En contrepartie, un patch placé après les traductions
+   doit cibler du code **déjà traduit** : viser des identifiants sans le mot
+   « frais », ou passer par une expression régulière.
 
 ---
 
