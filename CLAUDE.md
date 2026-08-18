@@ -80,6 +80,32 @@ modification est bien présente. Tous les no-op ne sont pas des bugs (beaucoup
 sont des fallbacks volontaires pour d'anciennes versions) — mais un **nouveau**
 no-op sur ton patch, si.
 
+### Les tests anti-régression : `tools/test-patches.js`
+
+```bash
+node tools/test-patches.js                     # à lancer avant chaque commit
+node tools/test-patches.js --update-baseline   # si une évolution est voulue
+```
+
+C'est le seul filet de sécurité du repo. Il vérifie :
+
+1. **Listes** — chaque patch listé existe ; `SHELL_FILES` du SW est aligné sur
+   la liste HTML de son canal ; aucun `notesfrais-*.js` orphelin sur le disque.
+2. **Exécution** — la chaîne tourne sans exception sur les 3 canaux et produit
+   un HTML complet.
+3. **Fonctionnalités** — ~30 marqueurs vérifiés dans le HTML généré (AccessGate,
+   URLs signées, file offline, OCR, dashboard finance, export ZIP, nav mobile,
+   12 mois, UI anglaise sur mike…), plus des interdits : aucun code d'accès en
+   dur, aucun `getPublicUrl` (le bucket est privé).
+4. **Baseline** (`tools/patch-baseline.json`) — le nombre de `replace()` sans
+   effet **par fichier et par canal** ne doit jamais augmenter, ni le nombre de
+   séquences mojibake par fichier.
+
+Le point 4 est celui qui attrape la panne caractéristique du projet. Exemple
+réel : ajouter une espace dans une chaîne cible de `test-compress.js` laisse
+tous les marqueurs fonctionnels au vert, mais fait échouer la baseline sur
+2 canaux. Les deux couches sont complémentaires — ne pas en retirer une.
+
 ---
 
 ## 2. Carte du repo
@@ -94,7 +120,9 @@ no-op sur ton patch, si.
 | `manifest*.webmanifest` | Manifests PWA, un par canal. |
 | `api/notify-submission.js` | Seule fonction serverless : mail à la finance via Resend. |
 | `supabase-*.sql` | Migrations à passer à la main dans le SQL Editor Supabase. |
-| `tools/check-patches.js` | Harnais de vérification des patches. |
+| `tools/check-patches.js` | Harnais : rejoue la chaîne, liste les `replace()` sans effet. |
+| `tools/test-patches.js` | Tests anti-régression. À lancer avant chaque commit. |
+| `tools/patch-baseline.json` | Baseline des no-op et du mojibake connus. |
 | `icon.svg`, `logo-numeriq-payroll.png` | Assets. |
 
 ---
@@ -222,8 +250,8 @@ Ordre de chargement de `mike.html` (le canal test est identique moins
 | 13 | `current-month.js` | Mois par défaut = mois courant (fallback `2026-03`). |
 | 14 | `test-payment-card.js` | Champ obligatoire « Carte utilisée » (entreprise/perso) → écrit dans `note`, badge 💳 dans les listes. |
 | 15-16 | `test-annual-stats.js`, `-fix.js` | **`loadData` charge les 12 mois en parallèle** (indispensable au dashboard finance et aux stats annuelles) + `StatsTab` avec bascule année/mois. |
-| 17 | `test-history-annual.js` | Largement supplanté par `-fix.js` (fallbacks). |
-| 18 | `test-search-dedupe.js` | Devait dédupliquer le champ de recherche — no-op aujourd'hui, sans effet visible. |
+| 17 | `test-history-annual.js` | Largement supplanté par `-fix.js`. Ne reste efficace que sur 3 remplacements ; les 5 autres sont des fallbacks inertes. |
+| 18 | `test-search-dedupe.js` | Déduplique le champ de recherche si deux inputs identiques deviennent adjacents. Le cas ne se produit plus depuis `period-inside-tabs.js` : le patch tourne mais ne fait rien. Filet de sécurité, à garder. |
 | 19 | `access.js` | `AccessGate` (login Supabase, rôles). |
 | 20 | `test-submission-badge.js` | Badge de statut de soumission + `submitCurrentMonth()` (UPDATE Supabase + appel `/api/notify-submission`). |
 | 21-24 | `test-finance-settings/-dashboard/-expenses/-receipts-zip.js` | Tout l'espace finance : mapping comptable, dashboard mensuel, tableau des frais, export ZIP (JSZip depuis le CDN). |
@@ -236,8 +264,8 @@ Ordre de chargement de `mike.html` (le canal test est identique moins
 | 31 | `test-finance-submissions.js` | Vue finance des mois soumis. |
 | 32-33 | `mike-en.js`, `mike-final-en.js` | Traduction FR → EN de tout le HTML final, par `split()/join()` de paires. **Chargés en dernier** : tout libellé français ajouté par un patch antérieur doit avoir sa paire ici. |
 
-**Orphelins** (chargés par aucune page, supplantés par `test-submission-badge.js`) :
-`notesfrais-test-submission-status.js`, `notesfrais-test-submission-status-v2.js`.
+Le test suite refuse tout `notesfrais-*.js` présent sur le disque et chargé par
+aucune page — donc pas de fichier orphelin qui traîne.
 
 ---
 
@@ -258,8 +286,11 @@ Ordre de chargement de `mike.html` (le canal test est identique moins
    dans l'ordre.
 4. L'ajouter à `SHELL_FILES` dans `test-sw.js` **et bumper `CACHE_NAME`**
    (`notesfrais-test-shell-v30` → `v31`).
-5. `node tools/check-patches.js test` → zéro nouveau no-op, et vérifier au
-   grep que la modification est bien dans la sortie.
+5. `node tools/test-patches.js` doit rester vert, et `node tools/check-patches.js
+   test` ne doit pas montrer de nouveau no-op sur ton fichier. Vérifier au grep
+   dans `.patch-out/out-test.html` que la modification est bien présente. Si le
+   patch ajoute une fonctionnalité durable, lui ajouter un marqueur dans
+   `REQUIRED` de `tools/test-patches.js`.
 6. Tester sur `/test`, puis promouvoir : mêmes gestes sur `mike.html` +
    `mike-sw.js` (bumper `notesfrais-mike-shell-vN`).
 
@@ -279,14 +310,19 @@ Ordre de chargement de `mike.html` (le canal test est identique moins
    trouvent leurs éléments par `textContent`. Changer « + Ajouter un frais »
    casse la barre de nav mobile.
 
-### Vérifier l'état des invariants
-
-```bash
-# listes HTML et SW synchronisées ? (doit ne rien afficher)
-for p in "mike.html mike-sw.js" "test.html test-sw.js"; do set -- $p
-  diff <(grep -o "notesfrais-[a-z0-9-]*\.js" $1|sort -u) \
-       <(grep -o "notesfrais-[a-z0-9-]*\.js" $2|sort -u); done
-```
+5. **Sur `/mike`, la traduction renomme aussi les identifiants JS.**
+   `mike-en.js` et `mike-final-en.js` appliquent leurs paires par
+   `split()/join()` sur **tout le document**, y compris le code. Les paires
+   `['frais','expenses']` et `['Frais','Expenses']` transforment donc
+   `window.notesFraisRole` en `window.notesExpensesRole`,
+   `belongsToNotesFraisChannel` en `belongsToNotesExpensesChannel`, la clé
+   `notesfrais_access` en `notesexpenses_access`… **Ça ne marche que parce que
+   la substitution est appliquée en dernier, uniformément, à tout le HTML final.**
+   Conséquences :
+   - ne jamais lire `window.notesFraisRole` depuis un script **externe** au
+     document généré : sur `/mike` la globale ne porte pas ce nom ;
+   - les constantes en MAJUSCULES (`NOTESFRAIS_*`) ne sont pas touchées — s'en
+     servir pour tout ce qui doit rester stable entre canaux.
 
 ---
 
@@ -384,13 +420,19 @@ patches quand on y touche.
 - `mobile-cleanup.js` ne matche que le libellé français `+ Ajouter un frais` :
   sur `/mike` (anglais) le bloc d'actions desktop n'est donc pas masqué en
   mobile.
-- `test-search-dedupe.js` et `test-history-annual.js` sont devenus des no-op
-  intégraux, supplantés par `test-annual-stats-fix.js` et
-  `test-period-inside-tabs.js`. Candidats à la suppression.
-- Deux fichiers orphelins (§5) à supprimer.
-- Les codes d'accès en dur `MIKE2026` / `FINANCE2026` traînent dans
-  `notesfrais-access.js`, désactivés par un flag. À retirer.
+- `index.html` et `iphone-fix.html` sont deux copies identiques. `vercel.json`
+  sert `iphone-fix.html` sur `/` ; `index.html` ne sert que de repli au
+  comportement par défaut de l'hébergeur. Toute modif doit aller dans les deux.
 - `supabase-auth-rls.sql` n'est pas exécutable en l'état (emails placeholder).
+
+### E. Déjà nettoyé (ne pas réintroduire)
+- Codes d'accès en dur `MIKE2026` / `FINANCE2026` et tout le chemin de login
+  « code local » : supprimés de `notesfrais-access.js`. L'auth Supabase est la
+  seule voie ; `tools/test-patches.js` échoue si ces chaînes reviennent.
+- `notesfrais-test-submission-status.js` et `-v2.js` : orphelins supprimés.
+- La modale `submitModal` dupliquée dans `notesfrais-patches.js` : sa cible ne
+  matchait pas (espace finale parasite) et `notesfrais-submit-summary.js` fait
+  le travail. Supprimée.
 
 ---
 

@@ -1,0 +1,219 @@
+#!/usr/bin/env node
+/*
+ * Tests anti-regression NotesFrais.
+ *
+ *   node tools/test-patches.js                  lance tous les tests
+ *   node tools/test-patches.js --update-baseline  reenregistre la baseline
+ *
+ * Ce repo n'a ni build ni framework de test. Ces tests s'appuient sur le fait
+ * que la chaine de patches est rejouable hors navigateur (tools/check-patches.js)
+ * : on genere le HTML final des trois canaux et on verifie des invariants
+ * dessus. Ils attrapent la panne caracteristique du projet, un html.replace()
+ * qui cesse de matcher en silence.
+ *
+ * Sortie non nulle si un test echoue.
+ */
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..');
+const BASELINE = path.join(__dirname, 'patch-baseline.json');
+const CHANNELS = { mike: 'mike.html', test: 'test.html', main: 'index.html' };
+const SERVICE_WORKERS = { mike: 'mike-sw.js', test: 'test-sw.js' };
+const UPDATE = process.argv.includes('--update-baseline');
+
+let failures = 0;
+let checks = 0;
+function ok(name) { checks++; console.log(`  ok   ${name}`); }
+function fail(name, detail) {
+  checks++; failures++;
+  console.log(`  FAIL ${name}`);
+  if (detail) String(detail).split('\n').forEach(l => console.log(`         ${l}`));
+}
+function assert(cond, name, detail) { cond ? ok(name) : fail(name, detail); }
+function section(title) { console.log(`\n${title}`); }
+
+const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
+const patchListOf = entry => {
+  const m = read(entry).match(/const patchFiles=\[([\s\S]*?)\];/);
+  if (!m) throw new Error(`tableau patchFiles introuvable dans ${entry}`);
+  return m[1].split(',').map(s => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
+};
+
+/* --- rejoue la chaine et collecte les replace() sans effet ------------- */
+function buildChannel(channel) {
+  const files = patchListOf(CHANNELS[channel]);
+  const noop = {};
+  const origReplace = String.prototype.replace;
+  let currentFile = null;
+  String.prototype.replace = function (search, repl) {
+    const before = String(this);
+    const out = origReplace.call(this, search, repl);
+    if (currentFile && before.length > 200 && out === before) {
+      noop[currentFile] = (noop[currentFile] || 0) + 1;
+    }
+    return out;
+  };
+  global.window = { NOTESFRAIS_CHANNEL: channel === 'main' ? undefined : channel };
+  global.document = { addEventListener() {} };
+  global.navigator = { onLine: true };
+  try {
+    for (const f of files) {
+      new Function(read(f))();
+      const inner = window.patchNotesFrais;
+      window.patchNotesFrais = (html) => {
+        const prev = currentFile;
+        currentFile = f;
+        try { return inner(html); } finally { currentFile = prev; }
+      };
+    }
+    return { files, html: window.patchNotesFrais(read('app.html')), noop, error: null };
+  } catch (e) {
+    return { files, html: '', noop, error: e };
+  } finally {
+    String.prototype.replace = origReplace;
+  }
+}
+
+/* --- 1. integrite des listes de patches -------------------------------- */
+section('1. Listes de patches et service workers');
+
+const lists = {};
+for (const [channel, entry] of Object.entries(CHANNELS)) {
+  let files;
+  try { files = patchListOf(entry); } catch (e) { fail(`${entry} : liste lisible`, e.message); continue; }
+  lists[channel] = files;
+  const missing = files.filter(f => !fs.existsSync(path.join(ROOT, f)));
+  assert(missing.length === 0, `${entry} : les ${files.length} patches existent`, missing.join('\n'));
+}
+
+for (const [channel, sw] of Object.entries(SERVICE_WORKERS)) {
+  const inHtml = [...new Set(lists[channel] || [])].sort();
+  const inSw = [...new Set(read(sw).match(/notesfrais-[a-z0-9-]+\.js/g) || [])].sort();
+  const onlyHtml = inHtml.filter(f => !inSw.includes(f));
+  const onlySw = inSw.filter(f => !inHtml.includes(f));
+  assert(onlyHtml.length === 0 && onlySw.length === 0,
+    `${sw} : SHELL_FILES aligne sur ${CHANNELS[channel]}`,
+    [...onlyHtml.map(f => `absent du SW : ${f}`), ...onlySw.map(f => `absent du HTML : ${f}`)].join('\n'));
+}
+
+const referenced = new Set(Object.values(lists).flat());
+const onDisk = fs.readdirSync(ROOT).filter(f => /^notesfrais-.*\.js$/.test(f));
+const orphans = onDisk.filter(f => !referenced.has(f));
+assert(orphans.length === 0, 'aucun patch orphelin sur le disque', orphans.join('\n'));
+
+/* --- 2. la chaine s'execute et produit du HTML ------------------------- */
+section('2. Execution de la chaine');
+
+const built = {};
+for (const channel of Object.keys(CHANNELS)) {
+  const r = buildChannel(channel);
+  built[channel] = r;
+  assert(!r.error, `canal ${channel} : la chaine s'execute sans exception`, r.error && r.error.stack);
+  assert(r.html.length > 40000, `canal ${channel} : HTML final non tronque (${r.html.length})`);
+  assert(r.html.includes('ReactDOM.render('), `canal ${channel} : point de montage React present`);
+}
+
+/* --- 3. invariants fonctionnels ---------------------------------------- */
+// Marqueurs choisis parmi des identifiants sans le mot "frais"/"Frais" :
+// sur /mike les patches de traduction remplacent ces mots partout, jusque
+// dans les identifiants JS (cf. CLAUDE.md).
+section('3. Fonctionnalites presentes dans le HTML genere');
+
+const REQUIRED = {
+  all: [
+    ['AccessGate present', 'function AccessGate('],
+    ['login Supabase', 'signInWithPassword'],
+    ['profil et role lus depuis app_profiles', "sb.from('app_profiles')"],
+    ['justificatifs en URL signee', 'createSignedUrl'],
+    ['file d attente hors ligne', 'function queueOfflineExpense('],
+    ['OCR avec pretraitement image', 'function preprocessReceiptImage('],
+    ['brouillon du formulaire', 'NOTESFRAIS_DRAFT_KEY'],
+    ['modale de resume avant soumission', 'showSubmitSummary'],
+  ],
+  mike: [
+    ['isolation de canal', 'NOTESFRAIS_CHANNEL_ISOLATION_V5'],
+    ['stockage cloisonne par canal', 'NOTESFRAIS_STORAGE_CHANNEL_PATHS_V2'],
+    ['12 mois disponibles', "{v:'2026-12'"],
+    ['selecteur de periode dans les onglets', 'NOTESFRAIS_PERIOD_INSIDE_TABS_TEST_V2'],
+    ['soumission du mois', 'submitCurrentMonth'],
+    ['notification email finance', '/api/notify-submission'],
+    ['dashboard finance', 'NOTESFRAIS_FINANCE_DASHBOARD_TEST_V1'],
+    ['parametres comptables finance', 'NOTESFRAIS_FINANCE_SETTINGS_TEST_V1'],
+    ['export ZIP des justificatifs', 'NOTESFRAIS_FINANCE_RECEIPTS_ZIP_TEST_V1'],
+    ['barre de navigation mobile', 'test-bottom-nav'],
+    ['compression des photos', 'compressReceiptImageForTest'],
+    ['UI anglaise active', 'Mike English UI active'],
+  ],
+  test: [
+    ['isolation de canal', 'NOTESFRAIS_CHANNEL_ISOLATION_V5'],
+    ['12 mois disponibles', "{v:'2026-12'"],
+    ['soumission du mois', 'submitCurrentMonth'],
+    ['dashboard finance', 'NOTESFRAIS_FINANCE_DASHBOARD_TEST_V1'],
+    ['barre de navigation mobile', 'test-bottom-nav'],
+    ['UI en francais', 'Historique'],
+  ],
+};
+
+// Doit avoir disparu : bucket public et acces par code en dur.
+const FORBIDDEN = [
+  ['pas de code d acces en dur', /MIKE2026|FINANCE2026|ACCESS_CODES/],
+  ['pas d URL publique de bucket', /getPublicUrl/],
+];
+
+for (const channel of Object.keys(CHANNELS)) {
+  const html = built[channel].html;
+  for (const [name, needle] of [...REQUIRED.all, ...(REQUIRED[channel] || [])]) {
+    assert(html.includes(needle), `${channel} : ${name}`, `chaine absente : ${needle}`);
+  }
+  for (const [name, re] of FORBIDDEN) {
+    const m = html.match(re);
+    assert(!m, `${channel} : ${name}`, m && `trouve : ${m[0]}`);
+  }
+}
+
+/* --- 4. baseline : no-op et encodage ne doivent pas empirer ------------ */
+section('4. Baseline (replace sans effet, double encodage UTF-8)');
+
+const mojibake = {};
+for (const f of onDisk.concat(['app.html'])) {
+  const n = (read(f).match(/Ã[©¨ª«¢\s]|â€|Â /g) || []).length;
+  if (n > 0) mojibake[f] = n;
+}
+
+const current = {
+  noop: Object.fromEntries(Object.entries(built).map(([c, r]) => [c, r.noop])),
+  mojibake,
+};
+
+if (UPDATE) {
+  fs.writeFileSync(BASELINE, JSON.stringify(current, null, 2) + '\n');
+  console.log(`  baseline reenregistree dans ${path.relative(ROOT, BASELINE)}`);
+} else if (!fs.existsSync(BASELINE)) {
+  fail('baseline presente', `${path.relative(ROOT, BASELINE)} manquant — lancer --update-baseline`);
+} else {
+  const base = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
+  for (const channel of Object.keys(CHANNELS)) {
+    const cur = current.noop[channel] || {};
+    const ref = (base.noop || {})[channel] || {};
+    const worse = Object.entries(cur)
+      .filter(([f, n]) => n > (ref[f] || 0))
+      .map(([f, n]) => `${f} : ${ref[f] || 0} -> ${n} replace sans effet`);
+    assert(worse.length === 0,
+      `${channel} : aucun nouveau replace() sans effet`,
+      worse.concat('un patch a cesse de matcher — corriger la chaine cible,',
+                   'ou si la regression est voulue : node tools/test-patches.js --update-baseline').join('\n'));
+    const fixed = Object.entries(ref).filter(([f, n]) => (cur[f] || 0) < n);
+    if (fixed.length) console.log(`  note   ${channel} : ${fixed.length} fichier(s) ameliore(s), penser a --update-baseline`);
+  }
+  const worseEnc = Object.entries(current.mojibake)
+    .filter(([f, n]) => n > ((base.mojibake || {})[f] || 0))
+    .map(([f, n]) => `${f} : ${(base.mojibake || {})[f] || 0} -> ${n} sequences mojibake`);
+  assert(worseEnc.length === 0,
+    'aucun nouveau double encodage UTF-8',
+    worseEnc.concat('un fichier a ete sauve deux fois en UTF-8 : ses chaines cibles accentuees ne matcheront plus').join('\n'));
+}
+
+/* --- resultat ---------------------------------------------------------- */
+console.log(`\n${failures === 0 ? 'OK' : 'ECHEC'} — ${checks - failures}/${checks} verifications passees`);
+process.exit(failures === 0 ? 0 : 1);
