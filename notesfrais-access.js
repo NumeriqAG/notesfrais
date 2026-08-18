@@ -91,6 +91,8 @@ function AccessGate({children}){
   }
 
   if(authSession&&profile){
+    window.notesFraisRole=profile.role||null;
+    window.notesFraisProfile=profile||null;
     return <>
       {children}
       <button onClick={logout} title="Changer d'accès" style={{position:'fixed',top:12,right:12,zIndex:2600,border:'0.5px solid rgba(26,26,26,0.08)',background:'rgba(255,255,255,0.92)',backdropFilter:'blur(10px)',color:'var(--t2)',borderRadius:999,padding:'7px 10px',fontSize:11,boxShadow:'0 8px 22px rgba(26,26,26,0.08)',cursor:'pointer'}}>{profile.role==='finance'?'Finance':'Mike'}</button>
@@ -98,6 +100,8 @@ function AccessGate({children}){
   }
 
   if(activeRole){
+    window.notesFraisRole=activeRole||null;
+    window.notesFraisProfile=profile||null;
     return <>
       {children}
       {activeRole==='finance'&&<button onClick={logout} title="Changer d'accès" style={{position:'fixed',top:12,right:12,zIndex:2600,border:'0.5px solid rgba(26,26,26,0.08)',background:'rgba(255,255,255,0.92)',backdropFilter:'blur(10px)',color:'var(--t2)',borderRadius:999,padding:'7px 10px',fontSize:11,boxShadow:'0 8px 22px rgba(26,26,26,0.08)',cursor:'pointer'}}>Finance</button>}

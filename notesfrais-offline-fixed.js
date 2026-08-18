@@ -24,16 +24,16 @@
     if(!html.includes('NOTESFRAIS_FETCH_TIMEOUT_MS')){
       html = html.replace(
         `function lastDayOfMonth(month){`,
-        `const NOTESFRAIS_FETCH_TIMEOUT_MS=6500;
+        `const NOTESFRAIS_FETCH_TIMEOUT_MS=20000;
 async function fetchExpensesWithTimeout(month){
   if(typeof navigator!=='undefined'&&!navigator.onLine){
-    throw new Error('Mode hors ligne - les donnees locales restent disponibles.');
+    throw new Error('Offline mode - local data remains available.');
   }
   let timer;
   try{
     return await Promise.race([
       fetchExpenses(month),
-      new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Connexion trop lente - ouverture en mode local.')),NOTESFRAIS_FETCH_TIMEOUT_MS);})
+      new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Connection is taking too long. Local mode is available, but you can retry.')),NOTESFRAIS_FETCH_TIMEOUT_MS);})
     ]);
   }finally{
     clearTimeout(timer);
@@ -49,7 +49,7 @@ function lastDayOfMonth(month){`
     let timedOut=false;
     const bootTimer=setTimeout(()=>{
       timedOut=true;
-      setDbError('Mode local - connexion indisponible. Les frais saisis hors ligne restent sur cet appareil.');
+      setDbError('Still connecting. If this stays here, use Retry.');
       setLoading(false);
     },NOTESFRAIS_FETCH_TIMEOUT_MS+1000);
     try{

@@ -11,8 +11,7 @@
     );
 
     const style = `<style id="notesfrais-test-period-inside-tabs-style">
-      [data-period-selector="true"]{display:none!important;}
-      [data-period-selector="true"] + div{display:none!important;}
+      [data-period-selector="legacy-hidden"]{display:none!important;}
     </style>`;
     html = html.replace('</head>', style + '\n</head>');
 
@@ -117,6 +116,11 @@ function PeriodHeader({title,subtitle,periodMode,setPeriodMode,month,setMonth,pe
     html = html.replace(
       "{submissionStatus==='submitted'?'Déjà soumis':syncing?'Soumission...':'Confirmer la soumission'}</button>",
       "{periodMode!=='month'?'Choisir un mois précis':submissionStatus==='submitted'?'Déjà soumis':syncing?'Soumission...':'Confirmer la soumission'}</button>"
+    );
+
+    html = html.replace(
+      "{tab==='stats'&&<StatsTab expenses={expenses} month={month} months={MONTHS}/>} ",
+      "{tab==='stats'&&<div style={{maxWidth:isMobile?'100%':900}}><PeriodHeader title={'Statistiques'} subtitle={ML} periodMode={periodMode} setPeriodMode={setPeriodMode} month={month} setMonth={setMonth} periodFrom={periodFrom} setPeriodFrom={setPeriodFrom} periodTo={periodTo} setPeriodTo={setPeriodTo} monthCounts={monthCounts}/><StatsTab expenses={expenses} month={month} months={MONTHS}/></div>} "
     );
 
     return html;

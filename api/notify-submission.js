@@ -1,5 +1,3 @@
-const DEFAULT_FINANCE_EMAIL = 'numeriqpayroll1@gmail.com';
-
 function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -69,7 +67,7 @@ module.exports = async function handler(req, res) {
     const expenseCount = Number(body.expenseCount || 0);
     const totalCHF = formatAmount(body.totalCHF);
     const submittedAt = cleanText(body.submittedAt, new Date().toISOString());
-    const financeEmail = cleanText(process.env.FINANCE_NOTIFICATION_EMAIL, DEFAULT_FINANCE_EMAIL);
+    const financeEmail = financeNotificationRecipient();
 
     const subject = `${userName} a soumis ses frais de ${monthLabel}`;
     const text = [
@@ -98,3 +96,13 @@ module.exports = async function handler(req, res) {
     return sendJson(res, 500, { ok: false, error: error.message || String(error) });
   }
 };
+
+function financeNotificationRecipient() {
+  const recipient = cleanText(process.env.FINANCE_NOTIFICATION_EMAIL);
+  if (!recipient) {
+    const error = new Error('FINANCE_NOTIFICATION_EMAIL missing');
+    error.statusCode = 500;
+    throw error;
+  }
+  return recipient;
+}

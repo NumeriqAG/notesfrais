@@ -36,7 +36,8 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 /* SUPABASE */
 function lastDayOfMonth(month){
   const [y,m]=month.split('-').map(Number);
-  return new Date(y,m,0).toISOString().split('T')[0];
+  const d=new Date(y,m,0).getDate();
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 async function fetchExpenses(month){
   const{data,error}=await sb.from('expenses').select('*').gte('date',`${month}-01`).lte('date',lastDayOfMonth(month)).order('date',{ascending:false});
@@ -152,7 +153,13 @@ const CATS=[{id:'repas',label:'Repas',icon:'🍽',color:'#E8F5E9'},{id:'transpor
 const CMAP=Object.fromEntries(CATS.map(c=>[c.id,c]));
 const MONTHS=[{v:'2026-01',l:'Janvier 2026'},{v:'2026-02',l:'Février 2026'},{v:'2026-03',l:'Mars 2026'},{v:'2026-04',l:'Avril 2026'},{v:'2026-05',l:'Mai 2026'},{v:'2026-06',l:'Juin 2026'}];
 const fmt=n=>Number(n||0).toFixed(2);
-const fd=d=>new Date(d+'T00:00:00').toLocaleDateString('fr-CH',{day:'2-digit',month:'short'});
+const fd=d=>{
+  const raw=String(d||'').trim();
+  const iso=raw.includes('T')?raw.slice(0,10):raw;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))return '';
+  const dt=new Date(iso+'T00:00:00');
+  return Number.isNaN(dt.getTime())?'':dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'short'});
+};
 const tot=arr=>arr.reduce((s,e)=>s+Math.abs(Number(e.amountCHF||e.amount||0)),0);
 const isPDF=u=>u&&u.toLowerCase().includes('.pdf');
 
@@ -298,7 +305,7 @@ function AddModal({onClose,onAdd,month}){
                     {ocrStatus==='scanning'&&<div style={{marginTop:4}}><div style={{fontSize:11,color:'var(--green)',marginBottom:3}}>⚙ OCR en cours… {ocrProgress}%</div><div style={{height:3,background:'#9FE1CB',borderRadius:99}}><div style={{width:`${ocrProgress}%`,height:'100%',background:'var(--green)',borderRadius:99,transition:'width 0.3s'}}/></div></div>}
                     {ocrStatus==='done'&&<div style={{fontSize:11,color:'var(--green)',marginTop:3}}>✓ OCR terminé — données extraites automatiquement</div>}
                     {ocrStatus==='error'&&<div style={{fontSize:11,color:'var(--amber)',marginTop:3}}>⚠ OCR indisponible — saisissez manuellement</div>}
-                    {!ocrStatus&&<div style={{fontSize:11,color:'#0F6E56',marginTop:2}}>{(file.size/1024).toFixed(0)} KB · stocké dans Supabase</div>}
+                    {!ocrStatus&&<div style={{fontSize:11,color:'#0F6E56',marginTop:2}}>{(file.size/1024).toFixed(0)} KB · stocké dans NotesFrais</div>}
                   </div>
                   <button onClick={()=>{setFile(null);setPreview(null);setOcrStatus(null);setOcrProgress(0);}} style={{background:'none',border:'none',cursor:'pointer',color:'var(--green)',fontSize:20,lineHeight:1}}>×</button>
                 </div>
@@ -429,7 +436,7 @@ function App(){
   const bycat=CATS.map(c=>({...c,t:mE.filter(e=>e.category===c.id).reduce((s,e)=>s+Number(e.amountCHF||0),0)})).filter(c=>c.t>0);
   const isMobile=viewportWidth<860;
 
-  if(loading)return(<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'100dvh',gap:16,background:'var(--bg)',padding:20}}><div style={{fontSize:48}}>🏦</div><div style={{fontWeight:600,fontSize:16}}>Connexion à Supabase…</div><div style={{fontSize:13,color:'var(--t3)'}}>Chargement des frais de Mike</div></div>);
+  if(loading)return(<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'100dvh',gap:16,background:'var(--bg)',padding:20}}><div style={{fontSize:48}}>🏦</div><div style={{fontWeight:600,fontSize:16}}>Connexion à NotesFrais…</div><div style={{fontSize:13,color:'var(--t3)'}}>Chargement des frais de Mike</div></div>);
 
   const ML=MONTHS.find(m2=>m2.v===month)?.l||month;
 
@@ -440,7 +447,7 @@ function App(){
       {viewer&&<ReceiptViewer url={viewer.url} name={viewer.name} onClose={()=>setViewer(null)}/>}
 
       <div style={{width:isMobile?'100%':220,background:'#fff',borderRight:isMobile?'none':'0.5px solid var(--border)',borderBottom:isMobile?'0.5px solid var(--border)':'none',display:'flex',flexDirection:'column',flexShrink:0,overflowY:'auto',position:isMobile?'sticky':'relative',top:0,zIndex:isMobile?30:1,boxShadow:isMobile?'0 8px 24px rgba(26,26,26,0.06)':'none'}}>
-        <div style={{padding:isMobile?'16px 16px 12px':'24px 20px 16px'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.1em',marginBottom:4}}>NOTES DE FRAIS</div><div style={{fontSize:18,fontWeight:700}}>Mike</div><div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}><span style={{width:7,height:7,borderRadius:'50%',background:dbError?'var(--red)':'var(--green)',display:'inline-block'}}/><span style={{fontSize:11,color:dbError?'var(--red)':'var(--green)'}}>{dbError?'Erreur connexion':'Supabase connecté'}</span></div></div>
+        <div style={{padding:isMobile?'16px 16px 12px':'24px 20px 16px'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.1em',marginBottom:4}}>NOTES DE FRAIS</div><div style={{fontSize:18,fontWeight:700}}>Mike</div><div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}><span style={{width:7,height:7,borderRadius:'50%',background:dbError?'var(--red)':'var(--green)',display:'inline-block'}}/><span style={{fontSize:11,color:dbError?'var(--red)':'var(--green)'}}>{dbError?'Erreur connexion':'NotesFrais connecté'}</span></div></div>
         <div style={{padding:isMobile?'0 12px 10px':'0 12px 12px'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.08em',padding:'0 8px',marginBottom:6}}>PÉRIODE</div><div style={{display:'flex',flexDirection:isMobile?'row':'column',gap:isMobile?8:0,overflowX:isMobile?'auto':'visible',paddingBottom:isMobile?4:0,WebkitOverflowScrolling:'touch'}}>{MONTHS.map(m=><button key={m.v} onClick={()=>setMonth(m.v)} style={{width:isMobile?'auto':'100%',minWidth:isMobile?132:'auto',textAlign:'left',padding:'7px 12px',borderRadius:8,border:'none',background:month===m.v?'var(--al)':'none',color:month===m.v?'var(--accent)':'var(--t2)',fontSize:13,fontWeight:month===m.v?500:400,cursor:'pointer',marginBottom:isMobile?0:2,display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexShrink:0}}><span>{m.l}</span>{monthCounts[m.v]>0&&<span style={{minWidth:20,height:20,padding:'0 6px',borderRadius:999,background:month===m.v?'rgba(26,63,181,0.12)':'var(--s2)',color:month===m.v?'var(--accent)':'var(--t3)',fontSize:11,fontWeight:600,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{monthCounts[m.v]}</span>}</button>)}</div></div>
         <div style={{height:'0.5px',background:'var(--border)',margin:'0 16px'}}/>
         <div style={{padding:'12px'}}><div style={{fontSize:10,color:'var(--t3)',letterSpacing:'0.08em',padding:'0 8px',marginBottom:6}}>NAVIGATION</div><div style={{display:'flex',flexDirection:isMobile?'row':'column',gap:isMobile?8:0,overflowX:isMobile?'auto':'visible',paddingBottom:isMobile?4:0,WebkitOverflowScrolling:'touch'}}>{[['home','🏠','Accueil'],['history','📋','Historique'],['stats','📊','Statistiques'],['recon','🏦','Relevé UBS']].map(([id,ic,lb])=><button key={id} onClick={()=>setTab(id)} style={{width:isMobile?'auto':'100%',minWidth:isMobile?120:'auto',textAlign:'left',padding:'8px 12px',borderRadius:8,border:'none',background:tab===id?'var(--al)':'none',color:tab===id?'var(--accent)':'var(--t2)',fontSize:13,fontWeight:tab===id?500:400,cursor:'pointer',marginBottom:isMobile?0:2,display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}><span>{ic} {lb}</span></button>)}</div></div>
@@ -449,7 +456,7 @@ function App(){
       </div>
 
       <div style={{flex:1,overflowY:'auto',padding:isMobile?16:28}}>
-        {dbError&&<div style={{background:'var(--rl)',borderRadius:12,padding:16,marginBottom:20,fontSize:13,color:'var(--red)',maxWidth:600}}><div style={{fontWeight:600,marginBottom:4}}>❌ Erreur Supabase</div><div style={{marginBottom:8}}>{dbError}</div><button onClick={loadData} style={{...bS,color:'var(--red)',borderColor:'#F09595',fontSize:12}}>🔄 Réessayer</button></div>}
+        {dbError&&<div style={{background:'var(--rl)',borderRadius:12,padding:16,marginBottom:20,fontSize:13,color:'var(--red)',maxWidth:600}}><div style={{fontWeight:600,marginBottom:4}}>❌ Erreur NotesFrais</div><div style={{marginBottom:8}}>{dbError}</div><button onClick={loadData} style={{...bS,color:'var(--red)',borderColor:'#F09595',fontSize:12}}>🔄 Réessayer</button></div>}
 
         {tab==='home'&&<div style={{maxWidth:isMobile?'100%':720}}><div style={{marginBottom:24}}><h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>{ML}</h1><div style={{fontSize:13,color:'var(--t3)'}}>Tableau de bord des frais professionnels</div></div><div style={{display:'grid',gridTemplateColumns:isMobile?'1fr 1fr':'repeat(4,1fr)',gap:12,marginBottom:24}}>{[{l:'Total',v:`CHF ${fmt(mT)}`,s:`${mE.length} frais`},{l:'TVA',v:`CHF ${fmt(tva)}`,s:'récupérable'},{l:'Réconciliés',v:`${rec.length}/${mE.length}`,s:`${pct}%`},{l:'Oubliés',v:forgotten.length,s:forgotten.length>0?'à régulariser':'aucun ✓'}].map((k,i)=><div key={i} style={{background:'#fff',borderRadius:12,padding:'16px 18px',border:'0.5px solid var(--border)'}}><div style={{fontSize:10,color:'var(--t3)',marginBottom:6,letterSpacing:'0.03em'}}>{k.l.toUpperCase()}</div><div style={{fontSize:20,fontWeight:700,fontFamily:'DM Mono',color:i===3&&forgotten.length>0?'var(--red)':'var(--text)'}}>{k.v}</div><div style={{fontSize:11,color:'var(--t3)',marginTop:3}}>{k.s}</div></div>)}</div><div style={{background:'#1A3FB5',borderRadius:14,padding:20,color:'#fff',marginBottom:20}}><div style={{display:'flex',justifyContent:'space-between',flexDirection:isMobile?'column':'row',gap:isMobile?12:0,marginBottom:16}}><div><div style={{fontSize:11,opacity:0.65,letterSpacing:'0.08em',marginBottom:4}}>RÉCONCILIATION UBS</div><div style={{fontSize:28,fontWeight:700,fontFamily:'DM Mono'}}>{pct}%</div></div><div style={{textAlign:isMobile?'left':'right',fontSize:12,opacity:0.8}}><div>{rec.length} réconciliés</div><div>{pend.length} en attente</div></div></div><div style={{height:6,background:'rgba(255,255,255,0.2)',borderRadius:99}}><div style={{width:`${pct}%`,height:'100%',background:pct===100?'#7CEFA0':'#FBD761',borderRadius:99,transition:'width 0.6s'}}/></div></div>{bycat.length>0&&<div style={{background:'#fff',borderRadius:12,padding:20,border:'0.5px solid var(--border)',marginBottom:20}}><div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Répartition par catégorie</div>{bycat.sort((a,b)=>b.t-a.t).map(c=>{const p=mT>0?Math.round(c.t/mT*100):0;return(<div key={c.id} style={{marginBottom:12}}><div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:5}}><span style={{fontWeight:500}}>{c.icon} {c.label}</span><span style={{fontFamily:'DM Mono',fontWeight:600}}>CHF {fmt(c.t)} <span style={{color:'var(--t3)',fontWeight:400,fontSize:11}}>({p}%)</span></span></div><div style={{height:6,background:'var(--s2)',borderRadius:99}}><div style={{width:`${p}%`,height:'100%',background:'var(--accent)',borderRadius:99}}/></div></div>);})}</div>}<button onClick={()=>{setSubmitted(true);notify('📧 Frais soumis au service RH !');setTimeout(()=>setSubmitted(false),3000);}} style={{...bP,width:isMobile?'100%':'auto',justifyContent:'center',padding:'14px 24px',background:submitted?'var(--green)':'var(--accent)',transition:'background 0.3s',fontSize:14}}>{submitted?'✓ Frais soumis !':'📤 Soumettre les frais du mois'}</button></div>}
 

@@ -9,10 +9,10 @@
       ['<html lang="fr">','<html lang="en">'],
       ['Chargement de NotesFrais...', 'Loading NotesFrais...'],
       ['Impossible de charger NotesFrais', 'Unable to load NotesFrais'],
-      ['Connexion Ã  Supabaseâ€¦', 'Connecting to Supabase...'],
+      ['Connexion Ã  NotesFraisâ€¦', 'Connecting to NotesFrais...'],
       ['Chargement des frais de Mike', 'Loading Mike expenses'],
       ['NOTES DE FRAIS', 'EXPENSES'],
-      ['Supabase connectÃ©', 'Supabase connected'],
+      ['NotesFrais connectÃ©', 'NotesFrais connected'],
       ['Erreur connexion', 'Connection error'],
       ['PÃ‰RIODE', 'PERIOD'],
       ['NAVIGATION', 'MENU'],
@@ -97,7 +97,7 @@
       ['OCR en coursâ€¦', 'OCR scanning...'],
       ['OCR terminÃ© â€” donnÃ©es extraites automatiquement', 'OCR done - data extracted automatically'],
       ['OCR indisponible â€” saisissez manuellement', 'OCR unavailable - enter manually'],
-      ['stockÃ© dans Supabase', 'stored in Supabase'],
+      ['stockÃ© dans NotesFrais', 'stored in NotesFrais'],
       ['CommerÃ§ant *', 'Merchant *'],
       ['Ex: Restaurant Le Bistrot', 'E.g. Restaurant Le Bistrot'],
       ['Montant CHF *', 'Amount CHF *'],
@@ -129,7 +129,8 @@
       ['AccÃ¨s protÃ©gÃ© par code local', 'Access protected by local code'],
       ['Changer d\'accÃ¨s', 'Change access'],
       ['frais en attente de synchronisation', 'expenses waiting to sync'],
-      ['Ils sont gardÃ©s sur cet iPhone et partiront automatiquement dÃ¨s que la connexion revient.', 'They are saved on this iPhone and will sync automatically when the connection returns.']
+      ['Ils sont gardÃ©s sur cet iPhone et partiront automatiquement dÃ¨s que la connexion revient.', 'They are saved on this iPhone and will sync automatically when the connection returns.'],
+      ['NotesExpenses', 'NotesFrais']
     ];
 
     for(const [from,to] of pairs){

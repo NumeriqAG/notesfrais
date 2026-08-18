@@ -108,8 +108,7 @@ function ensureScanCta(){
     cta.addEventListener('click',()=>{const add=findAddButton();if(add)add.click();});
     document.body.appendChild(cta);
   }
-  const tab=activeTab();
-  const show=isMobile()&&(tab==='home'||tab==='expenses')&&!isFinance()&&!modalOpen();
+  const show=isMobile()&&!isFinance()&&!modalOpen();
   cta.classList.toggle('test-hidden',!show);
   cta.style.display=isMobile()?'flex':'none';
 }
