@@ -196,6 +196,12 @@ check('il rassure sur la photo', amber.includes('photo is kept'));
 // Sans la cause, la meme panne se represente et personne ne sait pourquoi.
 check('il donne la cause', /CDN|Timeout|Error|SecurityError/i.test(amber),
   amber.replace(/\s+/g, ' ').slice(0, 140));
+// La sonde du worker blob: et l'identifiant de build voyagent avec la cause :
+// sans eux on ne distingue pas un correctif inefficace d'un shell perime.
+check('il sonde le worker blob:', /blob worker (OK|BLOQUE)/.test(amber),
+  amber.replace(/\s+/g, ' ').slice(0, 140));
+check('il donne le build', /build \d{4}-\d{2}-\d{2}/.test(amber),
+  amber.replace(/\s+/g, ' ').slice(0, 140));
 await shot('01-capture');
 
 // ── 3 · Enregistrer ───────────────────────────────────────────────────

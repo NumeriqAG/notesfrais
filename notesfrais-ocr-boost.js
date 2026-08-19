@@ -82,6 +82,22 @@
     const merchant=(usefulLines.find(l=>/[A-Za-zÀ-ÿ]{3}/.test(l)&&!/^[0-9]/.test(l)&&!money.test(l))||usefulLines[0]||'').replace(/[^A-Za-zÀ-ÿ0-9 '&.-]/g,'').substring(0,50);
     return{merchant,total,tva,date:extractedDate};
   }
+  // Tesseract construit son worker a partir d'une URL blob:. Si le CSP ne
+  // l'autorise pas, le constructeur Worker leve avant qu'un pixel soit lu.
+  // Cette sonde le dit depuis l'appareil de l'utilisateur, la ou la console
+  // n'est pas consultable.
+  function probeBlobWorker(){
+    let url=null;
+    try{
+      url=URL.createObjectURL(new Blob(['self.close();'],{type:'text/javascript'}));
+      new Worker(url).terminate();
+      return 'blob worker OK';
+    }catch(err){
+      return 'blob worker BLOQUE ('+((err&&err.name)||'Error')+')';
+    }finally{
+      if(url)URL.revokeObjectURL(url);
+    }
+  }
   const runOCR=async(imgFile)=>{
     if(!imgFile.type.startsWith('image/'))return;
     setOcrStatus('scanning');setOcrProgress(0);setOcrReason('');
@@ -114,7 +130,9 @@
       console.error('OCR error:',e);
       const name=(e&&e.name)||'Error';
       const message=String((e&&e.message)||e||'').slice(0,160);
-      setOcrReason(name==='Error'?message:(name+': '+message));
+      const cause=name==='Error'?message:(name+': '+message);
+      const build=typeof NOTESFRAIS_BUILD==='string'?NOTESFRAIS_BUILD:'?';
+      setOcrReason(cause+' \u00b7 '+probeBlobWorker()+' \u00b7 build '+build);
       setOcrStatus('error');
     }
   };

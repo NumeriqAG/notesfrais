@@ -50,6 +50,15 @@
     // ───────────────────────────────────────────────────────────────
     // 1 · La couche visuelle
     // ───────────────────────────────────────────────────────────────
+    // Un identifiant de build, affiche dans le bandeau d'echec d'OCR. Sans lui
+    // on ne sait pas distinguer « le correctif ne marche pas » de « le shell
+    // servi est l'ancien » — une PWA installee garde son shell jusqu'a une
+    // fermeture complete. A bumper a chaque livraison.
+    must(
+      "const fmt=n=>Number(n||0).toFixed(2);",
+      "const NOTESFRAIS_BUILD='2026-08-19-d';\nconst fmt=n=>Number(n||0).toFixed(2);"
+    );
+
     const style = `<style id="notesfrais-mobile-redesign-v1">
 @media(max-width:859px){
   body.nf-ios-mike{
