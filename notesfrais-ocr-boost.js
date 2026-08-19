@@ -157,7 +157,7 @@
       if(!window.Tesseract){
         await new Promise((resolve,reject)=>{
           const s=document.createElement('script');
-          s.src='https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
+          s.src='https://cdn.jsdelivr.net/npm/tesseract.js@4.1.4/dist/tesseract.min.js';
           s.onload=resolve;
           s.onerror=()=>reject(new Error('Tesseract could not be loaded from the CDN'));
           document.head.appendChild(s);
@@ -176,6 +176,13 @@
           timer=setTimeout(()=>reject(new Error('Timeout: reading took longer than 90 seconds')),90000);
         });
         return Promise.race([deadline,window.Tesseract.recognize(prepared,langs,{
+          // Par defaut Tesseract fabrique son worker depuis une URL blob: puis
+          // y fait un importScripts vers jsdelivr. Safari tue ce worker sans
+          // message : le script-src du document ne l'atteint pas. Servi depuis
+          // notre propre origine, c'est un worker classique ordinaire, et son
+          // importScripts du coeur WASM repasse sous la politique du document.
+          workerPath:'/tesseract-worker.min.js',
+          workerBlobURL:false,
           logger:m=>{
             if(m&&m.status){
               lastStatus=m.status;
