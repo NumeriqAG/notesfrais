@@ -82,7 +82,7 @@
   body.nf-ios-mike #nf-ios-header{
     padding:calc(9px + env(safe-area-inset-top)) 18px 9px!important;
     margin:0 -16px 14px!important;
-    background:rgba(242,242,247,.86)!important;
+    background:#F2F2F7!important;
     align-items:flex-end!important;
     transition:padding .18s ease;
   }
@@ -116,7 +116,7 @@
   body.nf-ios-mike [data-user-submit-placement]{
     background:#fff!important;border:0!important;border-radius:16px!important;
     box-shadow:var(--nfm-hair)!important;padding:15px 16px 13px!important;
-    margin-bottom:14px!important;display:block!important;
+    margin-bottom:14px!important;display:flex!important;flex-direction:column!important;
   }
   body.nf-ios-mike .nfm-sum-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
   body.nf-ios-mike .nfm-sum-label{font-size:11px;font-weight:600;color:var(--nfm-t3);letter-spacing:.02em}
@@ -137,16 +137,31 @@
   body.nf-ios-mike .nfm-sum-v{font-size:17px;font-weight:650;margin-top:3px;font-variant-numeric:tabular-nums}
   body.nf-ios-mike .nfm-track{height:4px;border-radius:99px;background:#E9E9EE;margin-top:12px;overflow:hidden}
   body.nf-ios-mike .nfm-track>i{display:block;height:100%;border-radius:99px;background:var(--nfm-accent)}
-  body.nf-ios-mike .nfm-sum-note{font-size:12.5px;line-height:1.45;color:var(--nfm-t2);margin-top:12px}
   /* Le bouton de soumission reel, restyle — la logique n'est pas touchee. */
-  body.nf-ios-mike [data-user-submit-placement]>button{
-    width:100%!important;min-width:0!important;min-height:46px!important;margin-top:14px!important;
+  body.nf-ios-mike [data-user-submit-placement]>button:not(.nfm-add-link){
+    order:9;width:100%!important;min-width:0!important;min-height:46px!important;margin-top:14px!important;
     border:0!important;border-radius:13px!important;background:var(--nfm-accent)!important;color:#fff!important;
     font-size:16px!important;font-weight:600!important;letter-spacing:-.01em!important;justify-content:center!important;
     box-shadow:none!important;
   }
-  body.nf-ios-mike [data-user-submit-placement]>button:disabled{
+  body.nf-ios-mike [data-user-submit-placement]>button:not(.nfm-add-link):disabled{
     background:#E9E9EE!important;color:var(--nfm-t3)!important;opacity:1!important;
+  }
+
+  /* ── Bandeau de contexte, juste au-dessus de la liste ──────────────
+     Il reprend le compte et le total : la carte du haut sort de l'ecran
+     des le premier defilement, cette ligne reste avec les frais. */
+  body.nf-ios-mike .nfm-strip{
+    display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    padding:0 4px 8px;font-size:11.5px;font-weight:700;letter-spacing:.04em;color:var(--nfm-t3);
+  }
+  body.nf-ios-mike .nfm-strip>b{
+    font-weight:700;color:var(--nfm-t2);font-variant-numeric:tabular-nums;letter-spacing:0;
+  }
+  /* Le lien d'ajout manuel, sous le bouton de soumission. */
+  body.nf-ios-mike .nfm-add-link{
+    order:10;width:100%;min-height:40px;margin-top:6px;border:0;background:transparent;
+    color:var(--nfm-accent);font-size:15.5px;font-weight:600;cursor:pointer;
   }
 
   /* ── Bandeaux d'etat ─────────────────────────────────────────────── */
@@ -270,7 +285,8 @@
   body.nf-ios-mike .nf-ios-expense-info>div:nth-child(3){display:none!important}
   /* La date reste du texte ; seuls le statut et la carte deviennent des pastilles. */
   body.nf-ios-mike .nf-ios-expense-info>div:nth-child(2) span:not(:first-child){
-    padding:2px 7px;border-radius:6px;font-size:10.5px;font-weight:600;background:#F2F2F7;color:#6B6B70;
+    padding:2px 7px!important;border-radius:6px!important;font-size:10.5px!important;font-weight:600!important;
+    background:#F2F2F7!important;color:#6B6B70!important;
   }
   body.nf-ios-mike .nf-ios-expense-row>.nf-ios-expense-amount{
     order:3;text-align:right!important;min-width:0!important;width:auto!important;flex:none;
@@ -281,7 +297,10 @@
   body.nf-ios-mike .nf-ios-expense-actions{
     justify-content:flex-end!important;gap:10px!important;margin-top:6px!important;
   }
-  body.nf-ios-mike .nf-ios-expense-actions button{font-size:12.5px!important;font-weight:600!important}
+  body.nf-ios-mike .nf-ios-expense-actions button{
+    font-size:15px!important;font-weight:600!important;
+    min-width:30px!important;min-height:30px!important;justify-content:center!important;
+  }
 
   /* ── Liste vide, premier usage ─────────────────────────────────────
      Un total a CHF 0.00 n'apprend rien le premier jour : on laisse
@@ -684,12 +703,49 @@
       '  <div><div className="nfm-sum-k">Matched with UBS</div><div className="nfm-sum-v">{ubsLoaded?(rec.length+\' / \'+mE.length):(\'\\u2014 / \'+mE.length)}</div></div>',
       '</div>',
       '<div className="nfm-track"><i style={{width:(ubsLoaded&&mE.length?Math.round(rec.length/mE.length*100):0)+\'%\'}}/></div>',
-      '<div className="nfm-sum-note">{mE.length+\' expense\'+(mE.length===1?\'\':\'s\')+\' \\u00b7 \'+fil.filter(e=>e.receiptPath||e.receiptUrl).length+\' with a receipt in the ZIP\'}</div>',
+      '{isMobile&&submissionStatus!==\'submitted\'&&<button type="button" className="nfm-add-link" onClick={()=>setShowAdd(true)}>+ Add expense</button>}',
       '</React.Fragment>'
     ].join('');
     mustRe(
       /<div><div style=\{\{fontSize:15,fontWeight:900\}\}>Ready to close \{ML\}\?<\/div><div style=\{\{fontSize:12,color:'var\(--t3\)',marginTop:3\}\}>\{mE\.length\+' expenses[\s\S]{0,120}?receipts'\}<\/div><\/div>/,
       summary
+    );
+
+    // ───────────────────────────────────────────────────────────────
+    // 3 bis · Le bandeau de contexte au-dessus de la liste
+    // ───────────────────────────────────────────────────────────────
+    // Il reste avec les frais quand la carte du haut a defile. Le total suit
+    // le filtre de categorie : « Meals » affiche le total des repas, pas
+    // celui du mois — sinon la ligne mentirait des qu'on filtre.
+    const strip = [
+      '{fil.length>0&&<div className="nfm-strip">',
+      '  <span>{fil.length+\' EXPENSE\'+(fil.length===1?\'\':\'S\')+\' \\u00b7 \'+fil.filter(e=>e.receiptPath||e.receiptUrl).length+\' WITH RECEIPT\'}</span>',
+      '  <b>{\'CHF \'+fmt(fil.reduce((t,e)=>t+(Number(e.amountCHF||e.amount)||0),0))}</b>',
+      '</div>}'
+    ].join('');
+    // L'ancre s'arrete avant le sous-titre : ce patch tourne AVANT le bloc
+    // « premier usage » ci-dessous, donc nfm-empty-hint n'existe pas encore.
+    const listOpen = "</div>{fil.length===0?<div style={{textAlign:'center',padding:'60px 20px',color:'var(--t3)'}}>"
+      + "<div style={{fontSize:48,marginBottom:12}}>\ud83d\udcdd</div>"
+      + "<div style={{fontWeight:500,fontSize:16,marginBottom:4}}>No expenses for this month</div>";
+    must(listOpen, "</div>" + strip + listOpen.slice("</div>".length));
+
+    // ───────────────────────────────────────────────────────────────
+    // 3 ter · La ligne, epuree comme la maquette
+    // ───────────────────────────────────────────────────────────────
+    // « CHF » est repete a chaque ligne alors que l'app est en CHF partout ;
+    // la maquette ne le garde que dans les totaux.
+    must(
+      "<div style={{fontWeight:700,fontFamily:'DM Mono',fontSize:15}}>CHF {fmt(e.amountCHF||e.amount)}</div>",
+      "<div style={{fontWeight:700,fontFamily:'DM Mono',fontSize:15}}>{isMobile?'':'CHF '}{fmt(e.amountCHF||e.amount)}</div>"
+    );
+    // L'emoji de carte bancaire double le libelle qu'il precede.
+    must(">\ud83d\udcb3 {getPaymentCardLabel(e.note)}<", ">{getPaymentCardLabel(e.note)}<");
+    // « Edit » a cote de la corbeille : deux poids differents pour deux
+    // actions voisines. Un crayon, comme la corbeille.
+    must(
+      "fontSize:13,fontWeight:800,padding:4}} title=\"Edit\">Edit</button>",
+      "fontSize:13,fontWeight:800,padding:4}} title=\"Edit\">{isMobile?'\u270f\ufe0f':'Edit'}</button>"
     );
 
     // Premier usage : dire ce que l'app fera, pas seulement qu'elle est vide.

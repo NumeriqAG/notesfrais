@@ -333,8 +333,22 @@ check('la ligne disparait de la liste',
 
 // ── 7 · Soumission ────────────────────────────────────────────────────
 console.log('\n7. Soumission du mois');
+// Le lien d'ajout manuel vit dans la meme carte que le bouton de soumission.
+const addLink = page.locator('.nfm-add-link');
+check('le lien « + Add expense » est present', await addLink.count() === 1);
+if (await addLink.count()) {
+  await addLink.click({ force: true });
+  await page.waitForTimeout(1500);
+  check('il ouvre la feuille de capture', await page.locator('[data-nfm-capture]').count() === 1);
+  await page.locator('.nfm-sheet-bar button:has-text("Cancel")').click({ force: true });
+  await page.waitForTimeout(1200);
+  const keep = page.locator('button:has-text("Keep as draft"), button:has-text("Discard")').first();
+  if (await keep.count() && await keep.isVisible()) { await keep.click({ force: true }); await page.waitForTimeout(900); }
+}
+check('le bandeau de contexte est au-dessus de la liste', await page.locator('.nfm-strip').count() === 1);
+
 mark = calls.length;
-await page.locator('[data-user-submit-placement] > button').click({ force: true });
+await page.locator('[data-user-submit-placement] > button:not(.nfm-add-link)').click({ force: true });
 await page.waitForTimeout(700);
 const summaryBtn = page.locator('button').filter({ hasText: /^(Submit|Confirm|Send)/ }).last();
 if (await page.locator('.nfm-bottom-sheet').count() && await summaryBtn.count()) {

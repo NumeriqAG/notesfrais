@@ -158,7 +158,7 @@ node tools/e2e-mobile.mjs test
 Les deux outils ci-dessus valident la **syntaxe** du HTML produit ; celui-ci
 valide le **comportement**. Il ouvre l'app dans Chromium avec `/api/*` simulé,
 puis **clique** : capture d'un frais, enchaînement « Save and add another »,
-import d'un CSV UBS, suppression avec confirmation, soumission du mois. 41
+import d'un CSV UBS, suppression avec confirmation, soumission du mois. 44
 assertions par canal, plus un journal des appels API qui prouve qu'un clic a
 bien agi.
 
