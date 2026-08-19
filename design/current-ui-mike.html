@@ -1310,7 +1310,7 @@ function getDefaultNotesFraisMonth(){
   return MONTHS.some(m=>m.v===current)?current:'2026-03';
 }
 const NOTESFRAIS_LOCALE_V1='en-GB';
-const NOTESFRAIS_BUILD='2026-08-19-d';
+const NOTESFRAIS_BUILD='2026-08-19-e';
 const fmt=n=>Number(n||0).toFixed(2);
 const fd=d=>{
   const raw=String(d||'').trim();
@@ -1574,10 +1574,29 @@ function AddModal({onClose,onAdd,month}){
       if(url)URL.revokeObjectURL(url);
     }
   }
+  // « undefined » remonte tel quel dans un catch : sans description robuste,
+  // le bandeau affichait une cause vide, ce qui n'apprend rien.
+  function describeError(e){
+    if(e===undefined)return 'rejet undefined';
+    if(e===null)return 'rejet null';
+    if(typeof e==='string')return e.slice(0,170);
+    const bits=[];
+    if(e.name)bits.push(e.name);
+    if(e.message)bits.push(e.message);
+    if(!bits.length){
+      let dump='';
+      try{dump=JSON.stringify(e);}catch(_){dump='';}
+      bits.push(Object.prototype.toString.call(e)+(dump&&dump!=='{}'?' '+dump:''));
+    }
+    return bits.join(': ').slice(0,170);
+  }
   const runOCR=async(imgFile)=>{
     if(!imgFile.type.startsWith('image/'))return;
     setOcrStatus('scanning');setOcrProgress(0);setOcrReason('');
+    // L'etape est la seule chose qui situe la panne quand l'erreur est vide.
+    let stage='depart';
     try{
+      stage='chargement Tesseract';
       if(!window.Tesseract){
         await new Promise((resolve,reject)=>{
           const s=document.createElement('script');
@@ -1587,28 +1606,39 @@ function AddModal({onClose,onAdd,month}){
           document.head.appendChild(s);
         });
       }
+      stage='pretraitement image';
       const prepared=await preprocessReceiptImage(imgFile);
+      stage='lecture ('+Math.round((prepared&&prepared.size||0)/1024)+' Ko)';
       // Tesseract telecharge son worker, son WASM et deux jeux de donnees de
       // langue. Sans borne, une de ces requetes qui n'aboutit jamais laisse la
       // barre a 0% indefiniment, sans message.
-      let timer;
-      const deadline=new Promise((_,reject)=>{
-        timer=setTimeout(()=>reject(new Error('Timeout: reading took longer than 90 seconds')),90000);
-      });
-      const result=await Promise.race([deadline,window.Tesseract.recognize(prepared,'fra+eng',{
-        logger:m=>{if(m.status==='recognizing text')setOcrProgress(Math.round(m.progress*100));},
-        tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÂÄÇÉÈÊËÎÏÔÖÙÛÜàâäçéèêëîïôöùûü0123456789.,:/- CHFchfTOTALtotalVATtvaMWSTmwst '
-      })]).finally(()=>clearTimeout(timer));
+      const read=langs=>{
+        let timer;
+        const deadline=new Promise((_,reject)=>{
+          timer=setTimeout(()=>reject(new Error('Timeout: reading took longer than 90 seconds')),90000);
+        });
+        return Promise.race([deadline,window.Tesseract.recognize(prepared,langs,{
+          logger:m=>{if(m.status==='recognizing text')setOcrProgress(Math.round(m.progress*100));},
+          tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÂÄÇÉÈÊËÎÏÔÖÙÛÜàâäçéèêëîïôöùûü0123456789.,:/- CHFchfTOTALtotalVATtvaMWSTmwst '
+        })]).finally(()=>clearTimeout(timer));
+      };
+      let result;
+      try{
+        result=await read('fra+eng');
+      }catch(first){
+        // 'fra+eng' telecharge deux jeux de donnees ; si l'un des deux
+        // n'arrive pas, une lecture en anglais seul vaut mieux que rien.
+        stage='lecture eng seul apres echec fra+eng ('+describeError(first)+')';
+        result=await read('eng');
+      }
+      stage='extraction des champs';
       const fields=extractReceiptFields(result.data.text||'');
       setForm(f=>({...f,merchant:fields.merchant||f.merchant,amount:fields.total?fields.total.toFixed(2):f.amount,tva:fields.tva?fields.tva.toFixed(2):f.tva,date:fields.date||f.date}));
       setOcrStatus('done');
     }catch(e){
       console.error('OCR error:',e);
-      const name=(e&&e.name)||'Error';
-      const message=String((e&&e.message)||e||'').slice(0,160);
-      const cause=name==='Error'?message:(name+': '+message);
       const build=typeof NOTESFRAIS_BUILD==='string'?NOTESFRAIS_BUILD:'?';
-      setOcrReason(cause+' \u00b7 '+probeBlobWorker()+' \u00b7 build '+build);
+      setOcrReason(stage+' \u2192 '+describeError(e)+' \u00b7 '+probeBlobWorker()+' \u00b7 build '+build);
       setOcrStatus('error');
     }
   };
