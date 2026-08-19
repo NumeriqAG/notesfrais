@@ -11,8 +11,8 @@ module.exports = async function handler(req, res) {
   try {
     const session = requireSession(req);
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    if (session.role !== 'user' || session.app_channel !== 'mike') {
-      return sendJson(res, 403, { ok: false, error: 'Only Mike can submit his month' });
+    if (session.role !== 'user' || !['mike', 'test'].includes(session.app_channel)) {
+      return sendJson(res, 403, { ok: false, error: 'Only a user channel can submit its month' });
     }
 
     await ensureSchema();
@@ -44,7 +44,7 @@ module.exports = async function handler(req, res) {
     const submittedAt = new Date().toISOString();
     const monthLabel = monthLabelFor(month);
     const totalCHF = rows.reduce((sum, row) => sum + Math.abs(Number(row.amount_chf || row.amount || 0)), 0);
-    const recipient = monthlySubmissionRecipient();
+    const recipient = monthlySubmissionRecipient(session.app_channel);
 
     const mail = await sendSubmissionEmail({
       to: recipient,
@@ -122,6 +122,7 @@ function receiptItemsFor(row) {
 }
 
 async function sendSubmissionEmail({ to, session, monthLabel, rows, totalCHF, submittedAt, zip }) {
+  const isTest = session && session.app_channel === 'test';
   if (!to) throw new Error('Finance email missing');
 
   const gmailUser = cleanText(process.env.GMAIL_SMTP_USER);
@@ -129,7 +130,7 @@ async function sendSubmissionEmail({ to, session, monthLabel, rows, totalCHF, su
   const from = process.env.MONTHLY_SUBMISSION_FROM ||
     process.env.RECEIPT_MAIL_FROM ||
     (gmailUser ? `NotesFrais Numeriq <${gmailUser}>` : process.env.SUBMISSION_MAIL_FROM || 'NotesFrais <onboarding@resend.dev>');
-  const subject = `Mike submitted expenses for ${monthLabel}`;
+  const subject = `${isTest ? '[PREPROD - ignorer] ' : ''}Mike submitted expenses for ${monthLabel}`;
   const totalLabel = formatAmount(totalCHF);
   const text = [
     `Mike submitted his expenses for ${monthLabel}.`,
@@ -296,8 +297,11 @@ function cleanText(value, fallback = '') {
   return String(value || fallback).replace(/[<>]/g, '').trim();
 }
 
-function monthlySubmissionRecipient() {
-  const recipient = cleanText(process.env.MONTHLY_SUBMISSION_EMAIL || process.env.FINANCE_NOTIFICATION_EMAIL);
+function monthlySubmissionRecipient(channel) {
+  // Une soumission de preprod part de preference vers une autre adresse ; a
+  // defaut elle rejoint la boite finance, mais son objet la signale (cf. subject).
+  const testRecipient = channel === 'test' ? cleanText(process.env.MONTHLY_SUBMISSION_TEST_EMAIL) : '';
+  const recipient = testRecipient || cleanText(process.env.MONTHLY_SUBMISSION_EMAIL || process.env.FINANCE_NOTIFICATION_EMAIL);
   if (!recipient) {
     const error = new Error('MONTHLY_SUBMISSION_EMAIL missing');
     error.statusCode = 500;
