@@ -158,7 +158,7 @@ node tools/e2e-mobile.mjs test
 Les deux outils ci-dessus valident la **syntaxe** du HTML produit ; celui-ci
 valide le **comportement**. Il ouvre l'app dans Chromium avec `/api/*` simulé,
 puis **clique** : capture d'un frais, enchaînement « Save and add another »,
-import d'un CSV UBS, suppression avec confirmation, soumission du mois. 44
+import d'un CSV UBS, suppression avec confirmation, soumission du mois. 51
 assertions par canal, plus un journal des appels API qui prouve qu'un clic a
 bien agi.
 
@@ -195,6 +195,7 @@ Les deux couches sont complémentaires — ne pas en retirer une.
 | `api/_lib/r2.js` | Stockage Cloudflare R2. |
 | `api/_lib/receipt-email.js` | Copie des reçus par email. |
 | `db/schema.sql` | Schéma Postgres. |
+| `tesseract-worker.min.js` | Worker OCR servi depuis notre origine. Version verrouillée (§5). |
 | `scripts/hash-password.mjs` | Génère une empreinte pour `NOTESFRAIS_USERS`. |
 | `tools/check-patches.js` | Rejoue la chaîne, liste les `replace()` sans effet. |
 | `tools/test-patches.js` | Tests anti-régression. **Avant chaque commit.** |
@@ -350,6 +351,15 @@ l'époque Supabase et continuent de tourner grâce au shim.
    - les constantes en MAJUSCULES (`NOTESFRAIS_*`) sont épargnées — s'en servir
      pour tout ce qui doit rester stable.
 
+   ⚠ **Ne plus conditionner la langue sur le canal.** `meal-context.js`,
+   `delete-confirm.js` et `mobile-redesign.js` testaient
+   `NOTESFRAIS_CHANNEL==='mike'` pour choisir entre français et anglais, alors
+   que **les deux canaux chargent `mike-en` et `english-ui`** : `/test` rendait
+   donc du français dans une interface anglaise. Les deux canaux produisent
+   aujourd'hui un HTML **strictement identique** — c'est vérifiable d'un coup
+   d'œil sur la taille affichée par `test-patches.js`, et c'est la propriété qui
+   fait que la préprod valide ce qu'on livre.
+
    **Deux emplacements possibles pour un nouveau patch**, à choisir sciemment :
    avant les traductions, et il faut alors ajouter ses paires ; ou après, et le
    patch porte lui-même ses deux langues via
@@ -357,6 +367,41 @@ l'époque Supabase et continuent de tourner grâce au shim.
    `delete-confirm.js`). La seconde voie est plus sûre pour tout texte neuf, mais
    impose de cibler du code **déjà traduit** : viser des identifiants sans le mot
    « frais », ou passer par une expression régulière.
+
+### Le piège du worker Tesseract
+
+Tesseract.js fabrique par défaut son worker depuis une URL `blob:`, puis fait un
+`importScripts` vers le CDN **depuis l'intérieur**. **Safari tue ce worker sans
+un mot** : le `script-src` du document, qui autorise pourtant jsdelivr,
+n'atteint pas un worker blob. Symptôme : `recognize()` rejette avec `undefined`
+et le `logger` n'est **jamais** appelé — pas même « loading tesseract core ».
+
+D'où :
+
+- `tesseract-worker.min.js` est **servi depuis notre origine** et passé en
+  `workerPath`, avec `workerBlobURL:false`. C'est alors un worker classique
+  same-origin, et son `importScripts` du cœur WASM repasse sous la politique du
+  document.
+- **La version est verrouillée des deux côtés** (`tesseract.js@4.1.4` pour le
+  script principal, le `worker.min.js` de la même 4.1.4 à la racine). Les deux
+  moitiés doivent correspondre exactement — ne pas remettre `@4` flottant.
+- Le cœur WASM reste sur le CDN (plusieurs Mo), et le **service worker ne doit
+  pas l'intercepter** : `mike-sw.js` et `test-sw.js` sortent tôt sur
+  `/tesseract/i` et sur `tessdata.projectnaptha.com`.
+- `vercel.json` déclare `worker-src 'self' blob: https://cdn.jsdelivr.net`,
+  `child-src 'self' blob:` et `'wasm-unsafe-eval'`. Sans `worker-src` ni
+  `child-src`, les workers retombent sur `default-src 'self'`, qui ne couvre pas
+  `blob:`.
+
+En cas d'échec, l'app **dit pourquoi** : le bandeau ambre de la feuille de
+capture porte l'étape atteinte, la description de l'erreur (y compris
+`undefined`), le dernier statut de Tesseract, la taille de l'image préparée, une
+sonde qui rejoue l'`importScripts` du worker, et **un identifiant de build**
+(`NOTESFRAIS_BUILD`, dans `mobile-redesign.js`, à bumper à chaque livraison).
+Ce dernier n'est pas décoratif : une PWA installée garde son shell jusqu'à une
+fermeture complète, et sans lui « le correctif ne marche pas » et « je teste
+l'ancienne version » se ressemblent. Ce diagnostic a coûté cinq allers-retours —
+ne pas le retirer.
 
 ### Le piège des dates Neon
 
