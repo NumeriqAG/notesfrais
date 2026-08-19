@@ -44,6 +44,8 @@
       ['Justificatifs','Receipts'],
       ['Reconcilies','Matched'],
       ['Réconciliés','Matched'],
+      ['Réconcilié','Matched'],
+      ['réconcilié','matched'],
       ['apres UBS','after UBS'],
       ['Aucune donnee pour cette periode','No data for this period'],
       ['Aucune donnée pour cette période','No data for this period'],

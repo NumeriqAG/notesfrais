@@ -140,6 +140,8 @@ const REQUIRED = {
     ['soumission mensuelle', '/api/monthly-submission'],
     ['justificatifs multiples', 'receiptItems'],
     ['dates normalisees en AAAA-MM-JJ', 'function nfNormalizeData('],
+    ['dates au format anglais', "const NOTESFRAIS_LOCALE_V1='en-GB'"],
+    ['plus de locale fr-CH en dur', 'toLocaleDateString(NOTESFRAIS_LOCALE_V1'],
     ['normalisation appliquee aux lectures', 'nfNormalizeData(out.data||[])'],
     ['edition d un frais', 'setEditingExpense'],
     ['file d attente hors ligne', 'function queueOfflineExpense('],

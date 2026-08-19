@@ -46,11 +46,11 @@ const expense = (id, day, merchant, amount, cat, status, note = '') => ({
 });
 
 const FIXTURES = [
-  expense(1, 3, 'Brasserie de la Paix', 67.2, 'repas', 'reconciled', 'Carte utilisee: entreprise\nWith: client Lausanne'),
-  expense(2, 5, 'SBB CFF Billetterie', 48, 'transport', 'reconciled', 'Carte utilisee: entreprise'),
-  expense(3, 11, 'Ibis Budget Lausanne', 89, 'hotel', 'pending', 'Carte utilisee: perso'),
-  expense(4, 14, 'Coop Supermarche', 43.6, 'repas', 'pending', 'Carte utilisee: entreprise'),
-  expense(5, 18, 'Apple Store Geneve', 249, 'materiel', 'pending', 'Carte utilisee: entreprise')
+  expense(1, 3, 'Brasserie de la Paix', 67.2, 'repas', 'reconciled', 'Payment card: company\nWith: client Lausanne'),
+  expense(2, 5, 'SBB CFF Billetterie', 48, 'transport', 'reconciled', 'Payment card: company'),
+  expense(3, 11, 'Ibis Budget Lausanne', 89, 'hotel', 'pending', 'Payment card: personal'),
+  expense(4, 14, 'Coop Supermarche', 43.6, 'repas', 'pending', 'Payment card: company'),
+  expense(5, 18, 'Apple Store Geneve', 249, 'materiel', 'pending', 'Payment card: company')
 ];
 
 const browser = await chromium.launch({
