@@ -18,8 +18,12 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const BASELINE = path.join(__dirname, 'patch-baseline.json');
-const CHANNELS = { mike: 'mike.html', test: 'test.html', main: 'index.html' };
-const SERVICE_WORKERS = { mike: 'mike-sw.js', test: 'test-sw.js' };
+const CHANNELS = { mike: 'mike.html' };
+// index.html et iphone-fix.html ne sont plus que des replis : vercel.json sert
+// mike.html sur /. Ils doivent rester des copies conformes, sinon on retombe
+// dans la divergence qui a coute cher a l'epoque des trois canaux.
+const FALLBACK_PAGES = ['index.html', 'iphone-fix.html'];
+const SERVICE_WORKERS = { mike: 'mike-sw.js' };
 const UPDATE = process.argv.includes('--update-baseline');
 
 let failures = 0;
@@ -54,7 +58,8 @@ function buildChannel(channel) {
     }
     return out;
   };
-  global.window = { NOTESFRAIS_CHANNEL: channel === 'main' ? undefined : channel };
+  const declared = (read(CHANNELS[channel]).match(/window\.NOTESFRAIS_CHANNEL='([^']*)'/) || [])[1];
+  global.window = { NOTESFRAIS_CHANNEL: declared };
   global.document = { addEventListener() {} };
   global.navigator = { onLine: true };
   try {
@@ -102,6 +107,12 @@ const onDisk = fs.readdirSync(ROOT).filter(f => /^notesfrais-.*\.js$/.test(f));
 const orphans = onDisk.filter(f => !referenced.has(f));
 assert(orphans.length === 0, 'aucun patch orphelin sur le disque', orphans.join('\n'));
 
+const mikeHtml = read('mike.html');
+for (const page of FALLBACK_PAGES) {
+  assert(read(page) === mikeHtml, `${page} : copie conforme de mike.html`,
+    'vercel.json sert mike.html sur / — ces pages doivent rester identiques');
+}
+
 /* --- 2. la chaine s'execute et produit du HTML ------------------------- */
 section('2. Execution de la chaine');
 
@@ -123,9 +134,12 @@ section('3. Fonctionnalites presentes dans le HTML genere');
 const REQUIRED = {
   all: [
     ['AccessGate present', 'function AccessGate('],
-    ['login Supabase', 'signInWithPassword'],
-    ['profil et role lus depuis app_profiles', "sb.from('app_profiles')"],
-    ['justificatifs en URL signee', 'createSignedUrl'],
+    ['login par cookie signe', '/api/session'],
+    ['frais lus et ecrits par l API', '/api/expenses'],
+    ['justificatifs via l API R2', '/api/receipts'],
+    ['soumission mensuelle', '/api/monthly-submission'],
+    ['justificatifs multiples', 'receiptItems'],
+    ['edition d un frais', 'setEditingExpense'],
     ['file d attente hors ligne', 'function queueOfflineExpense('],
     ['OCR avec pretraitement image', 'function preprocessReceiptImage('],
     ['brouillon du formulaire', 'NOTESFRAIS_DRAFT_KEY'],
@@ -136,33 +150,22 @@ const REQUIRED = {
     ['suppression jamais immediate', 'const deleteExpense=useCallback((id,receiptPath)=>{setPendingDelete'],
   ],
   mike: [
-    ['isolation de canal', 'NOTESFRAIS_CHANNEL_ISOLATION_V5'],
-    ['stockage cloisonne par canal', 'NOTESFRAIS_STORAGE_CHANNEL_PATHS_V2'],
     ['12 mois disponibles', "{v:'2026-12'"],
-    ['selecteur de periode dans les onglets', 'NOTESFRAIS_PERIOD_INSIDE_TABS_TEST_V2'],
+    ['selecteur de periode dans les onglets', 'function PeriodInsideTabs('],
     ['soumission du mois', 'submitCurrentMonth'],
-    ['notification email finance', '/api/notify-submission'],
-    ['dashboard finance', 'NOTESFRAIS_FINANCE_DASHBOARD_TEST_V1'],
-    ['parametres comptables finance', 'NOTESFRAIS_FINANCE_SETTINGS_TEST_V1'],
-    ['export ZIP des justificatifs', 'NOTESFRAIS_FINANCE_RECEIPTS_ZIP_TEST_V1'],
+    ['dashboard finance', 'function FinanceDashboardTab('],
+    ['parametres comptables finance', 'function FinanceSettingsTab('],
+    ['export ZIP des justificatifs', 'function downloadFinanceReceiptsZip('],
     ['barre de navigation mobile', 'test-bottom-nav'],
     ['compression des photos', 'compressReceiptImageForTest'],
     ['UI anglaise active', 'Mike English UI active'],
-  ],
-  test: [
-    ['isolation de canal', 'NOTESFRAIS_CHANNEL_ISOLATION_V5'],
-    ['12 mois disponibles', "{v:'2026-12'"],
-    ['soumission du mois', 'submitCurrentMonth'],
-    ['dashboard finance', 'NOTESFRAIS_FINANCE_DASHBOARD_TEST_V1'],
-    ['barre de navigation mobile', 'test-bottom-nav'],
-    ['UI en francais', 'Historique'],
   ],
 };
 
 // Doit avoir disparu : bucket public et acces par code en dur.
 const FORBIDDEN = [
   ['pas de code d acces en dur', /MIKE2026|FINANCE2026|ACCESS_CODES/],
-  ['pas d URL publique de bucket', /getPublicUrl/],
+  ['plus de client Supabase', /supabase\.createClient\(SUPABASE/],
 ];
 
 for (const channel of Object.keys(CHANNELS)) {

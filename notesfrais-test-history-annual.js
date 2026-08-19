@@ -30,7 +30,7 @@
     // Remove the previous hard-hide interval if it was injected by an older cached patch.
     html = html.replace(/function hardHideHistoryPeriodSelector\(\)\{[\s\S]*?setInterval\(hardHideHistoryPeriodSelector,500\);\n/, '');
 
-    if(!html.includes('function hardHideStatsPeriodSelector')){
+    if(false&&!html.includes('function hardHideStatsPeriodSelector')){
       html = html.replace(
         `ReactDOM.render(<React.StrictMode><App/></React.StrictMode>,document.getElementById('root'));`,
         `function hardHideStatsPeriodSelector(){

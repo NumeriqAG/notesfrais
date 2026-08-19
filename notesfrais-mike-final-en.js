@@ -6,8 +6,10 @@
     if(html.includes('Mike final English UI active')) return html;
 
     const pairs = [
-      ['Supabase connecté - synchronisé','Supabase connected - synced'],
-      ['Supabase connecté - ','Supabase connected - '],
+      ['NotesFrais connecté - synchronisé','NotesFrais connected - synced'],
+      ['NotesFrais connecté - ','NotesFrais connected - '],
+      ['NotesExpenses connected - synced','NotesFrais connected - synced'],
+      ['NotesExpenses connected - ','NotesFrais connected - '],
       [' à synchroniser',' to sync'],
       ['Hors ligne - sauvegarde locale prête','Offline - local save ready'],
       ['Mode local - connexion indisponible. Les frais saisis hors ligne restent sur cet appareil.','Local mode - connection unavailable. Offline expenses stay on this device.'],
@@ -132,6 +134,7 @@
     for(const [from,to] of pairs){
       html = html.split(from).join(to);
     }
+    html = html.split('NotesExpenses').join('NotesFrais').split('notesExpenses').join('notesFrais');
 
     html = html.split('/^+ Add expense/').join('/^\\+ Add expense/');
     html = html.replace(/Payment card:\\s\*\(entreprise\|perso\)/g,'Payment card:\\s*(company|personal)');

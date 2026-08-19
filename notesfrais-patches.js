@@ -11,7 +11,7 @@
 
 
     html=html.replace(/function StatsTab\(\{expenses,month,months\}\)\{return[\s\S]*?Vue d[^<]*<\/div><\/div>;\}/,statsScript);
-    html=html.replace(periodOld,periodNew).replace(navOld,navNew);
+    html=html.replace(periodOld,String.raw`{/* legacy sidebar period removed: page headers own period selection */}`).replace(navOld,navNew);
     html=html.replace(' capture="environment"','');
     html=html.replace("function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;","function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;\n  const formInputStyle=isMobile?{...inp,fontSize:16,padding:'12px 14px'}:inp;\n  const dateInputStyle={...formInputStyle,WebkitAppearance:'none',appearance:'none',minHeight:isMobile?44:undefined};");
     html=html.replace(/style=\{inp\}/g,"style={typeof formInputStyle!=='undefined'?formInputStyle:inp}");

@@ -1,5 +1,12 @@
 # NotesFrais — guide de travail
 
+> **⚠ CE DOCUMENT EST EN COURS DE REECRITURE.**
+> Il décrit l'architecture **Supabase**, remplacée par **Neon + Cloudflare R2**
+> lors de la fusion de `codex/neon-backend`. Restent exacts : la mécanique de la
+> chaîne de patches (§1), les pièges (§6) et les outils (`tools/`).
+> Sont **faux** : §4 (données, auth, RLS), §3 (trois canaux — il n'en reste qu'un),
+> et une partie de §5. Se fier au code et à `MIGRATION-SUPABASE.md` en attendant.
+
 Application de notes de frais de **Numeriq AG** (Suisse, CHF). Un salarié
 (Mike) photographie ses reçus, l'app les OCRise, les stocke dans Supabase,
 les réconcilie avec un relevé bancaire UBS, puis le mois est « soumis » à la

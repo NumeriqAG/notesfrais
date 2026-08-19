@@ -2,7 +2,7 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(window.NOTESFRAIS_CHANNEL !== 'test') return html;
+    if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;
     if(html.includes('NOTESFRAIS_USER_EXPENSES_TEST_V5')) return html;
 
     html = html.replace('function App(){', 'const NOTESFRAIS_USER_EXPENSES_TEST_V5=true;\nfunction App(){');
@@ -26,10 +26,6 @@
       "[['expenses','🧾','Frais'],['stats','📊','Statistiques'],['recon','🏦','Relevé UBS']]"
     );
 
-    html = html.replace(
-      "{tab==='home'&&<div",
-      "{(tab==='home'||(tab==='expenses'&&window.notesFraisRole!=='finance'))&&<div"
-    );
     html = html.replace(
       "{tab==='history'&&<div",
       "{(tab==='history'||(tab==='expenses'&&window.notesFraisRole!=='finance'))&&<div"

@@ -2,38 +2,28 @@
   "noop": {
     "mike": {
       "notesfrais-channel-storage.js": 1,
+      "notesfrais-offline.js": 1,
       "notesfrais-offline-fixed.js": 1,
       "notesfrais-channel-isolation.js": 2,
       "notesfrais-flow.js": 3,
-      "notesfrais-meal-context.js": 1,
-      "notesfrais-test-payment-card.js": 4,
+      "notesfrais-test-payment-card.js": 3,
       "notesfrais-test-annual-stats.js": 1,
       "notesfrais-test-annual-stats-fix.js": 1,
-      "notesfrais-test-history-annual.js": 5,
+      "notesfrais-test-history-annual.js": 6,
       "notesfrais-test-search-dedupe.js": 1,
-      "notesfrais-mike-final-en.js": 1
-    },
-    "test": {
-      "notesfrais-channel-storage.js": 1,
-      "notesfrais-offline-fixed.js": 1,
-      "notesfrais-channel-isolation.js": 2,
-      "notesfrais-flow.js": 3,
-      "notesfrais-meal-context.js": 1,
-      "notesfrais-test-payment-card.js": 4,
-      "notesfrais-test-annual-stats.js": 1,
-      "notesfrais-test-annual-stats-fix.js": 1,
-      "notesfrais-test-history-annual.js": 5,
-      "notesfrais-test-search-dedupe.js": 1,
-      "notesfrais-test-user-expenses.js": 3
-    },
-    "main": {
-      "notesfrais-flow.js": 3,
-      "notesfrais-meal-context.js": 1
+      "notesfrais-test-period-inside-tabs.js": 1,
+      "notesfrais-test-user-expenses.js": 3,
+      "notesfrais-mike-final-en.js": 1,
+      "notesfrais-api-backend.js": 6,
+      "notesfrais-multi-receipts.js": 2,
+      "notesfrais-english-ui.js": 5,
+      "notesfrais-ios-ui.js": 1,
+      "notesfrais-user-edit.js": 5
     }
   },
   "mojibake": {
+    "notesfrais-english-ui.js": 2,
     "notesfrais-flow.js": 7,
-    "notesfrais-meal-context.js": 2,
     "notesfrais-mike-en.js": 66,
     "notesfrais-test-payment-card.js": 1,
     "app.html": 1

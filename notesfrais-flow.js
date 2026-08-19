@@ -6,8 +6,29 @@
 
     const draftHelpers = String.raw`
 const NOTESFRAIS_DRAFT_KEY='notesfrais:add-draft:v1';
-function saveExpenseDraft(form){try{localStorage.setItem(NOTESFRAIS_DRAFT_KEY,JSON.stringify({form,ts:Date.now()}));}catch(e){}}
-function loadExpenseDraft(){try{const raw=localStorage.getItem(NOTESFRAIS_DRAFT_KEY);if(!raw)return null;const d=JSON.parse(raw);if(!d||!d.form||Date.now()-Number(d.ts||0)>7*86400000)return null;return d.form;}catch(e){return null;}}
+function isExpenseDraftMeaningful(form){
+  if(!form)return false;
+  const today=new Date().toISOString().split('T')[0];
+  return [
+    form.merchant,
+    form.amount,
+    form.tva,
+    form.note,
+    form.mealWith,
+    form.paymentCard,
+    form.card
+  ].some(value=>String(value||'').trim())
+    || (form.date&&form.date!==today)
+    || (form.category&&form.category!=='repas');
+}
+function saveExpenseDraft(form){
+  try{
+    if(!isExpenseDraftMeaningful(form)){localStorage.removeItem(NOTESFRAIS_DRAFT_KEY);return false;}
+    localStorage.setItem(NOTESFRAIS_DRAFT_KEY,JSON.stringify({form,ts:Date.now()}));
+    return true;
+  }catch(e){return false;}
+}
+function loadExpenseDraft(){try{const raw=localStorage.getItem(NOTESFRAIS_DRAFT_KEY);if(!raw)return null;const d=JSON.parse(raw);if(!d||!d.form||Date.now()-Number(d.ts||0)>7*86400000||!isExpenseDraftMeaningful(d.form)){localStorage.removeItem(NOTESFRAIS_DRAFT_KEY);return null;}return d.form;}catch(e){return null;}}
 function clearExpenseDraft(){try{localStorage.removeItem(NOTESFRAIS_DRAFT_KEY);}catch(e){}}
 `;
     html = html.replace('const lbl={display:', draftHelpers + '\nconst lbl={display:');

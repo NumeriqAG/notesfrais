@@ -4,6 +4,12 @@
     html = basePatch ? basePatch(html) : html;
     if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;
     if(html.includes('notesfrais-test-modal-fix')) return html;
+    if(html.includes('style={dateInputStyle}')&&!html.includes('const dateInputStyle=')){
+      html=html.replace(
+        /function AddModal\(\{onClose,onAdd,month\}\)\{\s*const isMobile=typeof window!=='undefined'&&window\.innerWidth<860;/,
+        "function AddModal({onClose,onAdd,month}){\n  const isMobile=typeof window!=='undefined'&&window.innerWidth<860;\n  const formInputStyle=isMobile?{...inp,fontSize:16,padding:'12px 14px'}:inp;\n  const dateInputStyle={...formInputStyle,WebkitAppearance:'none',appearance:'none',minHeight:isMobile?44:undefined};"
+      );
+    }
 
     const script = `<script id="notesfrais-test-modal-fix">(function(){
 function isMobile(){return window.innerWidth<860;}

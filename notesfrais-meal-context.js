@@ -2,11 +2,21 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(html.includes('mealWith')) return html;
+    if(html.includes('NOTESFRAIS_MEAL_CONTEXT_V2')) return html;
 
     html = html.replace(
-      `{merchant:'',amount:'',tva:'',date:defaultDate,category:'repas',note:''}`,
-      `{merchant:'',amount:'',tva:'',date:defaultDate,category:'repas',mealWith:'',note:''}`
+      'function AddModal(',
+      'const NOTESFRAIS_MEAL_CONTEXT_V2=true;\nfunction AddModal('
+    );
+    html = html.replace(
+      /category:'repas',note:''/g,
+      "category:'repas',mealWith:'',note:''"
+    );
+
+    const mealValidation = `if(form.category==='repas'&&!String(form.mealWith||'').trim()){setErr(window.NOTESFRAIS_CHANNEL==='mike'?'Who was this meal with?':'Avec qui etait ce repas ?');return;}\n    `;
+    html = html.replace(
+      /if\(!form\.merchant\)\{setErr\('[^']*'\);return;\}/,
+      match => mealValidation + match
     );
 
     html = html.replace(
@@ -17,14 +27,10 @@
       await onAdd({...form,note:finalNote,currency:'CHF',amountCHF:parseFloat(form.amount),amount:parseFloat(form.amount),tva:parseFloat(form.tva)||0,status:'pending',receipt$1,receiptName});`
     );
 
+    const mealField = `{form.category==='repas'&&<div><label style={lbl}>{window.NOTESFRAIS_CHANNEL==='mike'?'Who with? *':'Avec qui ? *'}</label><input required style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.mealWith||''} onChange={e=>setForm({...form,mealWith:e.target.value})} placeholder={window.NOTESFRAIS_CHANNEL==='mike'?'Client, colleagues, team...':'Client, collegues, equipe...'}/></div>}`;
     html = html.replace(
-      `<div><label style={lbl}>CatÃ©gorie</label><select style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{CATS.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select></div>`,
-      `<div><label style={lbl}>CatÃ©gorie</label><select style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{CATS.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select></div>{form.category==='repas'&&<div><label style={lbl}>{window.NOTESFRAIS_CHANNEL==='mike'?'Who with?':'Avec qui ?'}</label><input style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.mealWith||''} onChange={e=>setForm({...form,mealWith:e.target.value})} placeholder={window.NOTESFRAIS_CHANNEL==='mike'?'Consultants, client, team...':'Consultants, client, team...'}/></div>}`
-    );
-
-    html = html.replace(
-      `<div><label style={lbl}>Catégorie</label><select style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{CATS.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select></div>`,
-      `<div><label style={lbl}>Catégorie</label><select style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{CATS.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select></div>{form.category==='repas'&&<div><label style={lbl}>{window.NOTESFRAIS_CHANNEL==='mike'?'Who with?':'Avec qui ?'}</label><input style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.mealWith||''} onChange={e=>setForm({...form,mealWith:e.target.value})} placeholder={window.NOTESFRAIS_CHANNEL==='mike'?'Consultants, client, team...':'Consultants, client, team...'}/></div>}`
+      /(<div><label style=\{lbl\}>[^<]*Cat[^<]*<\/label><select[^>]*value=\{form\.category\}[\s\S]*?<\/select><\/div>)(?!\{form\.category==='repas')/,
+      `$1${mealField}`
     );
 
     return html;

@@ -15,6 +15,14 @@ function receiptExtension(expense){
   const m=source.match(/\.([a-zA-Z0-9]{2,6})$/);
   return m?m[1].toLowerCase():'jpg';
 }
+function zipReceiptDate(value){
+  const text=String(value||'date');
+  const m=text.match(/^\d{4}-\d{2}-\d{2}/);
+  return m?m[0]:safeZipPart(text);
+}
+function zipReceiptBaseName(value){
+  return safeZipPart(String(value||'recu').replace(/\.[a-zA-Z0-9]{2,6}$/,''));
+}
 async function ensureNotesFraisZip(){
   if(window.JSZip)return window.JSZip;
   await new Promise((resolve,reject)=>{
@@ -42,19 +50,24 @@ async function downloadFinanceReceiptsZip(expenses,label,setBusy){
       const e=receipts[i];
       try{
         const value=e.receiptPath||e.receiptUrl;
-        const url=typeof getReceiptUrl==='function'?await getReceiptUrl(value,true,e.receiptName||'justificatif'):value;
+        const path=typeof extractReceiptPath==='function'?extractReceiptPath(value):(!/^https?:\/\//i.test(String(value||''))?value:null);
+        const url=path?('/api/receipts?raw=1&path='+encodeURIComponent(path)+'&name='+encodeURIComponent(e.receiptName||'justificatif')):(/^https?:\/\//i.test(String(value||''))?value:null);
+        if(!url)throw new Error('Chemin de recu non recuperable');
         const res=await fetch(url);
         if(!res.ok)throw new Error('HTTP '+res.status);
         const blob=await res.blob();
         const ext=receiptExtension(e);
-        const name=[String(i+1).padStart(2,'0'),e.date||'date',safeZipPart(e.merchant),safeZipPart(e.receiptName||'recu')].filter(Boolean).join('_')+'.'+ext;
+        const name=[String(i+1).padStart(2,'0'),zipReceiptDate(e.date),safeZipPart(e.merchant),zipReceiptBaseName(e.receiptName||'recu')].filter(Boolean).join('_')+'.'+ext;
         zip.file(name,blob);
       }catch(err){
-        failures.push(e.merchant||e.receiptName||('recu '+(i+1)));
+        failures.push((e.date||'date')+' - '+(e.merchant||e.receiptName||('recu '+(i+1)))+' - '+(err.message||err));
       }
     }
-    if(Object.keys(zip.files).length===0)throw new Error('Aucun justificatif telechargeable');
-    if(failures.length>0)zip.file('_A_LIRE_erreurs.txt','Justificatifs non recuperes:\n'+failures.join('\n'));
+    if(Object.keys(zip.files).length===0){
+      zip.file('_A_LIRE_erreurs.txt','Aucun justificatif telechargeable pour cette periode.\n\nLes frais ci-dessous ont une reference de recu, mais le fichier source est introuvable ou non accessible. Ouvrez le frais dans Finance, cliquez sur Edit, puis Add / replace receipt pour rattacher le justificatif.\n\n'+failures.join('\n'));
+    }else if(failures.length>0){
+      zip.file('_A_LIRE_erreurs.txt','Justificatifs non recuperes:\n'+failures.join('\n')+'\n\nPour corriger: ouvrez le frais dans Finance, cliquez sur Edit, puis Add / replace receipt.');
+    }
     const content=await zip.generateAsync({type:'blob'});
     const a=document.createElement('a');
     const url=URL.createObjectURL(content);
