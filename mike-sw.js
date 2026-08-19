@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notesfrais-mike-shell-v70';
+const CACHE_NAME = 'notesfrais-mike-shell-v71';
 
 const SHELL_FILES = [
   '/mike',
@@ -88,6 +88,14 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
+
+  // Tesseract tire son worker et plusieurs megaoctets de WASM depuis jsdelivr.
+  // Rien de tout cela n'appartient au shell, et response.clone() suivi d'un
+  // cache.put sur un corps de cette taille est un candidat serieux a l'echec
+  // silencieux sur iPhone — echec qui, dans un worker, fait rejeter l'OCR sans
+  // le moindre message. Un intermediaire de moins sur ce chemin.
+  if (/tesseract/i.test(url.pathname) || url.hostname === 'tessdata.projectnaptha.com') return;
+
   const shouldHandle =
     url.origin === self.location.origin ||
     url.hostname === 'cdn.jsdelivr.net' ||

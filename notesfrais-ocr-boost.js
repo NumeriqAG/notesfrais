@@ -119,6 +119,13 @@
     setOcrStatus('scanning');setOcrProgress(0);setOcrReason('');
     // L'etape est la seule chose qui situe la panne quand l'erreur est vide.
     let stage='depart';
+    let preparedKo=0;
+    // Tesseract annonce ou il en est : « loading tesseract core »,
+    // « initializing tesseract », « loading language traineddata »,
+    // « initializing api », « recognizing text ». Quand il rejette avec
+    // undefined, ce dernier statut est la seule chose qui situe la panne.
+    let lastStatus='(aucun statut)';
+    let workerError='';
     try{
       stage='chargement Tesseract';
       if(!window.Tesseract){
@@ -132,7 +139,8 @@
       }
       stage='pretraitement image';
       const prepared=await preprocessReceiptImage(imgFile);
-      stage='lecture ('+Math.round((prepared&&prepared.size||0)/1024)+' Ko)';
+      preparedKo=Math.round((prepared&&prepared.size||0)/1024);
+      stage='lecture ('+preparedKo+' Ko)';
       // Tesseract telecharge son worker, son WASM et deux jeux de donnees de
       // langue. Sans borne, une de ces requetes qui n'aboutit jamais laisse la
       // barre a 0% indefiniment, sans message.
@@ -142,7 +150,13 @@
           timer=setTimeout(()=>reject(new Error('Timeout: reading took longer than 90 seconds')),90000);
         });
         return Promise.race([deadline,window.Tesseract.recognize(prepared,langs,{
-          logger:m=>{if(m.status==='recognizing text')setOcrProgress(Math.round(m.progress*100));},
+          logger:m=>{
+            if(m&&m.status){
+              lastStatus=m.status;
+              if(m.status==='recognizing text')setOcrProgress(Math.round(m.progress*100));
+            }
+          },
+          errorHandler:err=>{workerError=describeError(err);},
           tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÂÄÇÉÈÊËÎÏÔÖÙÛÜàâäçéèêëîïôöùûü0123456789.,:/- CHFchfTOTALtotalTVAtvaMWSTmwst '
         })]).finally(()=>clearTimeout(timer));
       };
@@ -152,7 +166,7 @@
       }catch(first){
         // 'fra+eng' telecharge deux jeux de donnees ; si l'un des deux
         // n'arrive pas, une lecture en anglais seul vaut mieux que rien.
-        stage='lecture eng seul apres echec fra+eng ('+describeError(first)+')';
+        stage='lecture eng seul apres echec fra+eng ['+lastStatus+' \u2192 '+describeError(first)+']';
         result=await read('eng');
       }
       stage='extraction des champs';
@@ -162,7 +176,15 @@
     }catch(e){
       console.error('OCR error:',e);
       const build=typeof NOTESFRAIS_BUILD==='string'?NOTESFRAIS_BUILD:'?';
-      setOcrReason(stage+' \u2192 '+describeError(e)+' \u00b7 '+probeBlobWorker()+' \u00b7 build '+build);
+      const detail=[
+        stage+' \u2192 '+describeError(e),
+        'dernier statut: '+lastStatus,
+        workerError?('worker: '+workerError):'',
+        'image '+preparedKo+' Ko',
+        probeBlobWorker(),
+        'build '+build
+      ].filter(Boolean).join(' \u00b7 ');
+      setOcrReason(detail);
       setOcrStatus('error');
     }
   };
