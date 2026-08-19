@@ -10,8 +10,8 @@
         ? '/manifest-mike.webmanifest'
         : '/manifest.webmanifest';
     const appTitle = channel === 'test' ? 'NotesFrais Test' : 'NotesFrais';
-    const swScript = channel === 'mike' ? '/mike-sw.js' : '/sw.js';
-    const swScope = channel === 'mike' ? '/mike' : '/';
+    const swScript = channel === 'test' ? '/test-sw.js' : channel === 'mike' ? '/mike-sw.js' : '/sw.js';
+    const swScope = channel === 'test' ? '/test' : channel === 'mike' ? '/mike' : '/';
 
     const pwaHead = '<link rel="manifest" href="' + manifest + '"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/icon.svg"><meta name="theme-color" content="#1A3FB5"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="' + appTitle + '"><meta name="apple-mobile-web-app-status-bar-style" content="default">';
 

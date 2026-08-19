@@ -2,6 +2,7 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
+    if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;
     if(html.includes('NOTESFRAIS_ENGLISH_UI_V1')) return html;
 
     const pairs = [

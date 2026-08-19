@@ -18,12 +18,12 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const BASELINE = path.join(__dirname, 'patch-baseline.json');
-const CHANNELS = { mike: 'mike.html' };
+const CHANNELS = { mike: 'mike.html', test: 'test.html' };
 // index.html et iphone-fix.html ne sont plus que des replis : vercel.json sert
 // mike.html sur /. Ils doivent rester des copies conformes, sinon on retombe
 // dans la divergence qui a coute cher a l'epoque des trois canaux.
 const FALLBACK_PAGES = ['index.html', 'iphone-fix.html'];
-const SERVICE_WORKERS = { mike: 'mike-sw.js' };
+const SERVICE_WORKERS = { mike: 'mike-sw.js', test: 'test-sw.js' };
 const UPDATE = process.argv.includes('--update-baseline');
 
 let failures = 0;
@@ -149,6 +149,14 @@ const REQUIRED = {
     ['confirmation avant suppression : modale', 'data-nf-delete-confirm'],
     ['suppression jamais immediate', 'const deleteExpense=useCallback((id,receiptPath)=>{setPendingDelete'],
   ],
+  test: [
+    ['12 mois disponibles', "{v:'2026-12'"],
+    ['selecteur de periode dans les onglets', 'function PeriodInsideTabs('],
+    ['soumission du mois', 'submitCurrentMonth'],
+    ['dashboard finance', 'function FinanceDashboardTab('],
+    ['export ZIP des justificatifs', 'function downloadFinanceReceiptsZip('],
+    ['edition disponible en preprod', 'setEditingExpense'],
+  ],
   mike: [
     ['12 mois disponibles', "{v:'2026-12'"],
     ['selecteur de periode dans les onglets', 'function PeriodInsideTabs('],
@@ -167,6 +175,17 @@ const FORBIDDEN = [
   ['pas de code d acces en dur', /MIKE2026|FINANCE2026|ACCESS_CODES/],
   ['plus de client Supabase', /supabase\.createClient\(SUPABASE/],
 ];
+
+// Chaque canal doit enregistrer SON service worker sur SA portee : une portee
+// trop large et la preprod ecrase le shell de la production.
+const SW_EXPECTED = { mike: ['/mike-sw.js', '/mike'], test: ['/test-sw.js', '/test'] };
+for (const [channel, [script, scope]] of Object.entries(SW_EXPECTED)) {
+  if (!built[channel]) continue;
+  const found = (built[channel].html.match(/serviceWorker\.register\("([^"]*)",\{scope:"([^"]*)"\}/) || []).slice(1);
+  assert(found[0] === script && found[1] === scope,
+    `${channel} : enregistre ${script} sur ${scope}`,
+    `trouve : ${found[0] || 'aucun'} sur ${found[1] || '?'}`);
+}
 
 for (const channel of Object.keys(CHANNELS)) {
   const html = built[channel].html;

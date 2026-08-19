@@ -2,7 +2,7 @@
   const basePatch=window.patchNotesFrais;
   window.patchNotesFrais=function(html){
     html=basePatch?basePatch(html):html;
-    if(window.NOTESFRAIS_CHANNEL!=='mike')return html;
+    if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;
     if(html.includes('NOTESFRAIS_USER_EDIT_V1'))return html;
 
     const component=String.raw`

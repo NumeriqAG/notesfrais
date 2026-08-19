@@ -19,6 +19,26 @@
       "notesfrais-english-ui.js": 5,
       "notesfrais-ios-ui.js": 1,
       "notesfrais-user-edit.js": 5
+    },
+    "test": {
+      "notesfrais-channel-storage.js": 1,
+      "notesfrais-offline.js": 1,
+      "notesfrais-offline-fixed.js": 1,
+      "notesfrais-channel-isolation.js": 2,
+      "notesfrais-flow.js": 3,
+      "notesfrais-test-payment-card.js": 3,
+      "notesfrais-test-annual-stats.js": 1,
+      "notesfrais-test-annual-stats-fix.js": 1,
+      "notesfrais-test-history-annual.js": 6,
+      "notesfrais-test-search-dedupe.js": 1,
+      "notesfrais-test-period-inside-tabs.js": 1,
+      "notesfrais-test-user-expenses.js": 3,
+      "notesfrais-mike-final-en.js": 1,
+      "notesfrais-api-backend.js": 6,
+      "notesfrais-multi-receipts.js": 2,
+      "notesfrais-english-ui.js": 5,
+      "notesfrais-ios-ui.js": 1,
+      "notesfrais-user-edit.js": 5
     }
   },
   "mojibake": {

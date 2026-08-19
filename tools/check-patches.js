@@ -18,7 +18,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUT_DIR = path.join(ROOT, '.patch-out');
-const ENTRIES = { mike: 'mike.html', test: 'test.html', main: 'index.html' };
+const ENTRIES = { mike: 'mike.html', test: 'test.html' };
 
 const channel = process.argv[2] || 'mike';
 const entry = ENTRIES[channel];
@@ -59,7 +59,8 @@ String.prototype.replace = function (search, repl) {
 };
 
 // Environnement navigateur minimal attendu par les patches.
-global.window = { NOTESFRAIS_CHANNEL: channel === 'main' ? undefined : channel };
+const declared = (entryHtml.match(/window\.NOTESFRAIS_CHANNEL='([^']*)'/) || [])[1];
+global.window = { NOTESFRAIS_CHANNEL: declared };
 global.document = { addEventListener() {} };
 global.navigator = { onLine: true };
 

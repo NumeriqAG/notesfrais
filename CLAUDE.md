@@ -73,6 +73,25 @@ base côté client. Le front parle à des routes serverless :
 | `POST /api/monthly-submission` | Clôture le mois + email à la finance **avec les justificatifs en ZIP**. |
 | `POST /api/notify-submission` | Email de notification simple. Probablement supplanté par la route ci-dessus — à vérifier avant de s'en servir. |
 
+### Les deux canaux
+
+`vercel.json` sert `mike.html` sur `/` et `/mike`, `test.html` sur `/test`.
+
+**`/test` est un miroir exact de `/mike`** : même liste de 40 patches, même
+interface, même code. Seul `window.NOTESFRAIS_CHANNEL` diffère, et il pilote
+quatre choses : le `app_channel` des frais, le préfixe des clés R2, le manifest
+PWA et le service worker. C'est délibéré — une préprod qui diverge de la
+production ne valide pas ce qu'on livre, et ce dépôt a déjà payé ce prix (voir
+le piège 4 en §5).
+
+Le harnais le vérifie : les deux canaux doivent produire le même nombre de
+remplacements et de no-op, et chacun doit enregistrer **son** service worker sur
+**sa** portée — une portée trop large et la préprod écrase le shell de la prod.
+
+**Il faut un compte de test.** Les quatre variables historiques ne déclarent que
+`mike` et `finance` ; un compte avec `app_channel: 'test'` impose de passer par
+`NOTESFRAIS_USERS` (§3).
+
 Le pont entre les deux moitiés est **`notesfrais-api-backend.js`**. Il remplace
 par expression régulière tout le bloc
 
@@ -95,7 +114,8 @@ Rien ne signale un `replace()` sans effet, donc un harnais rejoue la chaîne hor
 navigateur et les liste :
 
 ```bash
-node tools/check-patches.js mike
+node tools/check-patches.js mike   # production
+node tools/check-patches.js test   # preprod
 ```
 
 Il écrit le HTML final dans `.patch-out/out-mike.html` — **exactement ce que le
@@ -139,10 +159,11 @@ Les deux couches sont complémentaires — ne pas en retirer une.
 | Fichier | Rôle |
 |---|---|
 | `app.html` | Le socle React. `App`, `AddModal`, `UBSModal`, `ReceiptViewer`, `Thumb`, `Badge`, `StatsTab`. Parseur CSV UBS + moteur de réconciliation. |
-| `mike.html` | Page d'entrée = **liste ordonnée des 40 patches**. |
+| `mike.html` | Page d'entrée production = **liste ordonnée des 40 patches**. |
+| `test.html` | Préproduction. **Miroir exact de `mike.html`**, seul `NOTESFRAIS_CHANNEL` change. |
 | `index.html`, `iphone-fix.html` | Replis, copies conformes de `mike.html` (un test l'impose). `vercel.json` sert `mike.html` sur `/`. |
 | `notesfrais-*.js` | Les patches (§4). |
-| `mike-sw.js` | Service worker. |
+| `mike-sw.js`, `test-sw.js` | Service workers, un par canal, portées `/mike` et `/test`. |
 | `api/*.js` | Les routes serverless. |
 | `api/_lib/auth.js` | Cookie signé, comptes, limitation des tentatives. |
 | `api/_lib/db.js` | Client Neon, normalisation des frais. |
@@ -273,6 +294,9 @@ l'époque Supabase et continuent de tourner grâce au shim.
 4. L'ajouter à `SHELL_FILES` dans `mike-sw.js` **et bumper `CACHE_NAME`**.
 5. `node tools/test-patches.js` doit rester vert. Si le patch ajoute une
    fonctionnalité durable, lui ajouter un marqueur dans `REQUIRED`.
+6. **Valider sur `/test` avant `/mike`.** Les deux canaux chargent la même
+   liste, donc un patch ajouté à `mike.html` arrive aussi en préprod : déployer,
+   vérifier sur `/test`, et seulement ensuite annoncer la prod bonne.
 
 ### Les cinq pièges qui coûtent le plus cher
 
@@ -392,9 +416,6 @@ signé reste valable 14 jours même après changement de mot de passe. Pas de tr
 de qui fait quoi. Une vraie table utilisateurs reste à faire.
 
 ### E. Divers
-- Le canal `test` n'a plus de page d'entrée, mais le schéma et les routes le
-  supportent toujours (`app_channel = 'test'`). **Il n'y a donc plus de palier de
-  préproduction** : tout déploiement va directement chez Mike.
 - `app.html` garde 2 occurrences mortes de la clé Supabase.
 - `/api/notify-submission` coexiste avec `/api/monthly-submission` ; vérifier
   lequel fait foi avant d'y toucher.

@@ -2,7 +2,7 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(window.NOTESFRAIS_CHANNEL !== 'mike') return html;
+    if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;
     if(html.includes('notesfrais-ios-ui-v1')) return html;
 
     html = html.replace(
