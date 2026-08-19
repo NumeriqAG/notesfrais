@@ -148,6 +148,31 @@ Le seul filet de sécurité du dépôt. Il vérifie :
    entièrement blanche. Le bundle (2,8 Mo) n'est pas versionné — téléchargé une
    fois dans `.patch-out/`, et le test est sauté sans échouer si le réseau manque.
 
+### Les tests de parcours : `tools/e2e-mobile.mjs`
+
+```bash
+node tools/e2e-mobile.mjs mike
+node tools/e2e-mobile.mjs test
+```
+
+Les deux outils ci-dessus valident la **syntaxe** du HTML produit ; celui-ci
+valide le **comportement**. Il ouvre l'app dans Chromium avec `/api/*` simulé,
+puis **clique** : capture d'un frais, enchaînement « Save and add another »,
+import d'un CSV UBS, suppression avec confirmation, soumission du mois. 41
+assertions par canal, plus un journal des appels API qui prouve qu'un clic a
+bien agi.
+
+Il existe parce que la compilation JSX ne voit pas la **portée**. Un
+identifiant hors portée compile parfaitement et n'explose qu'au clic : c'est
+exactement ce qui est arrivé à `nfmAgain` dans `UBSModal`, où un `replace()`
+global de la refonte mobile avait posé du code de `AddModal`. Aucun des deux
+autres outils ne pouvait le voir.
+
+Les captures atterrissent dans `.patch-out/e2e/` — les regarder, pas seulement
+lire le compte-rendu : le logo illisible dans la puce « Company card » et la
+feuille qui restait au milieu du défilement après un enchaînement ne se voient
+qu'à l'image.
+
 Le point 4 attrape la panne caractéristique du projet : ajouter une espace dans
 une chaîne cible laisse tous les marqueurs au vert mais fait échouer la baseline.
 Les deux couches sont complémentaires — ne pas en retirer une.
@@ -173,6 +198,8 @@ Les deux couches sont complémentaires — ne pas en retirer une.
 | `scripts/hash-password.mjs` | Génère une empreinte pour `NOTESFRAIS_USERS`. |
 | `tools/check-patches.js` | Rejoue la chaîne, liste les `replace()` sans effet. |
 | `tools/test-patches.js` | Tests anti-régression. **Avant chaque commit.** |
+| `tools/e2e-mobile.mjs` | Parcours mobile pilotés dans Chromium. Attrape les erreurs de portée. |
+| `tools/screenshot-ui.mjs` | Rend l'interface réelle hors ligne et la photographie. |
 | `MIGRATION-SUPABASE.md` | Journal de la migration, écrit par Codex. |
 
 ---

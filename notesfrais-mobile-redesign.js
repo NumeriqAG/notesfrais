@@ -425,12 +425,12 @@
     padding:0 15px;text-align:left;
   }
   .nfm-card small{font-size:12px;font-weight:500;opacity:.7}
-  .nfm-card img{display:block;height:24px;width:auto;opacity:.85;mix-blend-mode:multiply}
   .nfm-card.nfm-on{background:#1A3FB5;color:#fff;box-shadow:none}
-  .nfm-card.nfm-on img{filter:brightness(0) invert(1);mix-blend-mode:normal;opacity:.95}
+  .nfm-card.nfm-on small{opacity:.85}
   .nfm-err{font-size:13px;color:#A32D2D;padding:0 4px}
 
   /* ── Soumission : la progression en trois etapes ─────────────────── */
+  .nfm-progress-scrim{position:fixed;inset:0;z-index:5390;background:rgba(0,0,0,.35)}
   .nfm-progress{
     position:fixed;left:16px;right:16px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:5400;
     background:#fff;border-radius:18px;padding:16px;box-shadow:0 18px 50px rgba(0,0,0,.24);
@@ -497,7 +497,8 @@
     must(
       '  const confirm=async()=>{',
       '  const nfmReset=()=>{setFile(null);setPreview(null);setOcrStatus(null);setOcrProgress(0);setErr(\'\');' +
-      'setForm(prev=>({merchant:\'\',amount:\'\',tva:\'\',date:prev.date,category:prev.category,mealWith:\'\',note:\'\',paymentCard:prev.paymentCard||\'\'}));};\n' +
+      'setForm(prev=>({merchant:\'\',amount:\'\',tva:\'\',date:prev.date,category:prev.category,mealWith:\'\',note:\'\',paymentCard:prev.paymentCard||\'\'}));' +
+      'const b=document.querySelector(\'.nfm-sheet-body\');if(b)b.scrollTop=0;};\n' +
       '  const confirm=async(nfmAgain)=>{'
     );
     // Les deux sorties de confirm() : succes en ligne, et repli hors ligne.
@@ -587,7 +588,7 @@
       '            <div className="nfm-cards">',
       '              <button type="button" className={form.paymentCard===\'entreprise\'?\'nfm-card nfm-on\':\'nfm-card\'} onClick={()=>{setForm({...form,paymentCard:\'entreprise\'});setErr(\'\');}}>',
       '                <span>Company card</span>',
-      '                <img src="/logo-numeriq-payroll.png" alt="NUMERIQ PAYROLL"/>',
+      '                <small>NUMERIQ PAYROLL</small>',
       '              </button>',
       '              <button type="button" className={form.paymentCard===\'perso\'?\'nfm-card nfm-on\':\'nfm-card\'} onClick={()=>{setForm({...form,paymentCard:\'perso\'});setErr(\'\');}}>',
       '                <span>Personal card</span>',
@@ -699,7 +700,7 @@
       '  ];',
       '  const nfmAt=nfmSteps.findIndex(s=>s.k===submissionStep);',
       "  const nfmIdx=submissionStep==='Done'?nfmSteps.length:(nfmAt<0?0:nfmAt);",
-      '  return ReactDOM.createPortal(<div className="nfm-progress">',
+      '  return ReactDOM.createPortal(<React.Fragment><div className="nfm-progress-scrim"/><div className="nfm-progress">',
       '    {nfmSteps.map((s,i)=>{',
       "      const done=i<nfmIdx,active=i===nfmIdx;",
       "      return <div key={s.k} className={'nfm-step'+(done?' nfm-done':active?' nfm-active':'')}>",
@@ -708,7 +709,7 @@
       '      </div>;',
       '    })}',
       "    <div className=\"nfm-progress-foot\">{nfmIdx>=nfmSteps.length?'Almost done \\u2014 do not close the app.':'This can take up to 90 seconds. Keep this page open.'}</div>",
-      '  </div>, document.body);',
+      '  </div></React.Fragment>, document.body);',
       '})()}'
     ].join('\n');
     must(progressFrom, progressTo);
