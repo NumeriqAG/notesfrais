@@ -56,7 +56,7 @@
     // fermeture complete. A bumper a chaque livraison.
     must(
       "const fmt=n=>Number(n||0).toFixed(2);",
-      "const NOTESFRAIS_BUILD='2026-08-19-h';\nconst fmt=n=>Number(n||0).toFixed(2);"
+      "const NOTESFRAIS_BUILD='2026-08-19-i';\nconst fmt=n=>Number(n||0).toFixed(2);"
     );
 
     const style = `<style id="notesfrais-mobile-redesign-v1">
@@ -434,8 +434,14 @@
   .nfm-hero-lens>span{display:block;width:26px;height:20px;border-radius:4px;box-shadow:inset 0 0 0 2.4px #fff}
   .nfm-hero-t{font-size:17px;font-weight:650;color:#000}
   .nfm-hero-s{font-size:13.5px;color:#8E8E93;text-align:center;line-height:1.45;max-width:240px}
-  .nfm-hero-alt{display:flex;gap:8px;margin-top:4px}
-  .nfm-hero-alt>span{padding:8px 14px;border-radius:11px;background:#F2F2F7;color:#1A3FB5;font-size:14px;font-weight:600}
+  /* Les deux autres sources sortent de la carte : c'etaient des <span> dans
+     un <button>, donc du decor imbrique et non cliquable. */
+  .nfm-hero-alt{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .nfm-hero-alt>button{
+    min-height:46px;border:0;border-radius:14px;background:#fff;color:#1A3FB5;
+    font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 0 0 .5px rgba(60,60,67,.13);
+  }
+  .nfm-hero-alt>button small{display:block;font-size:11.5px;font-weight:500;color:#8E8E93;margin-top:1px}
   .nfm-shot{
     display:flex;gap:14px;align-items:center;background:#fff;border-radius:18px;padding:14px;
     box-shadow:0 0 0 .5px rgba(60,60,67,.13);
@@ -582,6 +588,20 @@
       '      :ocrStatus===\'error\'?{l:\'Could not read it \\u2014 photo kept\',c:\'#BA7517\',p:100}',
       '      :{l:\'Waiting for the photo\',c:\'#8E8E93\',p:0};',
       '    const nfmCanSave=!!form.paymentCard&&!uploading;',
+      // capture="environment" ouvre la camera et RIEN d'autre sur iOS : ni
+      // photothèque, ni Fichiers, ni PDF. On reconfigure la meme entree juste
+      // avant de l'ouvrir plutot que d'en multiplier les refs. Les attributs
+      // ne sont pas declares en JSX, donc React ne les remet pas.
+      '    const nfmPick=mode=>{',
+      '      const el=fRef.current;',
+      '      if(!el)return;',
+      '      if(mode===\'camera\'){el.setAttribute(\'capture\',\'environment\');el.accept=\'image/*\';}',
+      '      else if(mode===\'library\'){el.removeAttribute(\'capture\');el.accept=\'image/*\';}',
+      '      else{el.removeAttribute(\'capture\');el.accept=\'application/pdf,image/*\';}',
+      // Sans ca, rechoisir le meme fichier ne declenche aucun change.
+      '      el.value=\'\';',
+      '      el.click();',
+      '    };',
       // La feuille est portee sur <body>. Rendue en place, elle herite d'un
       // ancetre qui rend la hauteur d'un position:fixed indefinie : le pied
       // remontait de 220px et flottait au milieu de l'ecran.
@@ -593,14 +613,19 @@
       '          <button type="button" className="nfm-strong" disabled={!nfmCanSave} onClick={()=>confirm(false)}>Save</button>',
       '        </div>',
       '        <div className="nfm-sheet-body">',
-      '          <input ref={fRef} type="file" accept="image/*,.pdf" capture="environment" style={{display:\'none\'}} onChange={e=>{if(e.target.files[0])handleFile(e.target.files[0]);}}/>',
+      '          <input ref={fRef} type="file" style={{display:\'none\'}} onChange={e=>{if(e.target.files[0])handleFile(e.target.files[0]);}}/>',
       '          {!file',
-      '            ?<button type="button" className="nfm-hero" onClick={()=>fRef.current.click()}>',
-      '               <span className="nfm-hero-lens"><span/></span>',
-      '               <span className="nfm-hero-t">Take a photo of the receipt</span>',
-      '               <span className="nfm-hero-s">One tap opens the camera. Amount, VAT, date and merchant are filled in for you.</span>',
-      '               <span className="nfm-hero-alt"><span>Library</span><span>PDF</span></span>',
-      '             </button>',
+      '            ?<React.Fragment>',
+      '               <button type="button" className="nfm-hero" onClick={()=>nfmPick(\'camera\')}>',
+      '                 <span className="nfm-hero-lens"><span/></span>',
+      '                 <span className="nfm-hero-t">Take a photo of the receipt</span>',
+      '                 <span className="nfm-hero-s">One tap opens the camera. Amount, VAT, date and merchant are filled in for you.</span>',
+      '               </button>',
+      '               <div className="nfm-hero-alt">',
+      '                 <button type="button" data-nfm-source="library" onClick={()=>nfmPick(\'library\')}>Photo library<small>a photo already taken</small></button>',
+      '                 <button type="button" data-nfm-source="files" onClick={()=>nfmPick(\'files\')}>Files<small>PDF, iCloud, Drive</small></button>',
+      '               </div>',
+      '             </React.Fragment>',
       '            :<div className="nfm-shot">',
       '               {preview===\'pdf\'',
       '                 ?<div className="nfm-shot-img">PDF</div>',
@@ -612,7 +637,7 @@
       '                   <div className="nfm-ocr-l" style={{color:nfmOcr.c}}>{nfmOcr.l}</div>',
       '                   <div className="nfm-ocr-track"><i style={{width:nfmOcr.p+\'%\',background:nfmOcr.c}}/></div>',
       '                 </div>',
-      '                 <button type="button" onClick={()=>{setFile(null);setPreview(null);setOcrStatus(null);setOcrProgress(0);}} style={{marginTop:10,border:0,background:\'transparent\',color:\'#1A3FB5\',fontSize:14,fontWeight:600,padding:0,cursor:\'pointer\'}}>Replace photo</button>',
+      '                 <button type="button" onClick={()=>{setFile(null);setPreview(null);setOcrStatus(null);setOcrProgress(0);}} style={{marginTop:10,border:0,background:\'transparent\',color:\'#1A3FB5\',fontSize:14,fontWeight:600,padding:0,cursor:\'pointer\'}}>Replace receipt</button>',
       '               </div>',
       '             </div>}',
       // Le justificatif est la seule copie : l'echec d'OCR ne doit pas laisser
