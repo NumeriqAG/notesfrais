@@ -331,6 +331,23 @@ l'époque Supabase et continuent de tourner grâce au shim.
    impose de cibler du code **déjà traduit** : viser des identifiants sans le mot
    « frais », ou passer par une expression régulière.
 
+### Le piège des dates Neon
+
+Neon renvoie les colonnes `date` comme des **objets `Date` JavaScript**, là où
+Supabase renvoyait des chaînes `AAAA-MM-JJ`. Sérialisées en JSON, elles
+deviennent `"2026-08-31T00:00:00.000Z"`.
+
+Or **le front compare les dates comme des chaînes** :
+`e.date >= periodStart && e.date <= periodEnd`, avec `periodEnd` = dernier jour
+du mois. Un frais du 31 août échouait donc le test — il disparaissait de la
+liste, des totaux, et de la soumission qui construit sa liste d'ids depuis `mE`.
+
+`notesfrais-api-backend.js` normalise `date` et `ubs_date` en `AAAA-MM-JJ` sur
+les quatre chemins qui renvoient des lignes (`nfNormalizeData`). **Toute
+nouvelle route qui renvoie une colonne de type date doit passer par là**, sinon
+le bug revient ailleurs. Le même piège avait produit des noms de fichiers
+`Wed-Aug-19-2026-00-00-00-GMT…` dans le ZIP envoyé à la finance.
+
 ### Toucher aux routes API
 
 Il n'y a pas de RLS pour rattraper une erreur. Toute nouvelle route part de
@@ -354,7 +371,13 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
   frais `reconciled`, et `forgotten` = lignes UBS sans frais correspondant.
 - **Soumission.** `POST /api/monthly-submission` avec `{month}` : passe le mois
   en `submitted`, **construit un ZIP des justificatifs et l'attache à l'email**
-  envoyé à la finance. Timeout client de 90 s, avec étapes affichées.
+  envoyé à la finance. Timeout client de 90 s. Les deux canaux utilisateur
+  peuvent soumettre ; une soumission de préprod part vers
+  `MONTHLY_SUBMISSION_TEST_EMAIL` si définie, sinon vers la finance avec l'objet
+  préfixé `[PREPROD - ignorer]`. **L'email part avant la clôture** : sans
+  destinataire configuré, la soumission échoue entièrement.
+- **Supprimer un frais efface aussi ses justificatifs de R2.** Sans ça ils
+  deviennent inatteignables, l'accès exigeant une ligne en base qui les référence.
 - **Copie des reçus par email.** À chaque frais créé avec justificatif, un email
   part vers `RECEIPT_BACKUP_EMAIL` (défaut : l'email de la session).
 - **Offline.** IndexedDB `notesfrais-offline-v1`, fichier sérialisé en data-URL
@@ -369,7 +392,8 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
 `NOTESFRAIS_USERS` **ou** `NOTESFRAIS_USER_EMAIL/PASSWORD` +
 `NOTESFRAIS_FINANCE_EMAIL/PASSWORD` · `R2_ACCOUNT_ID` · `R2_ACCESS_KEY_ID` ·
 `R2_SECRET_ACCESS_KEY` · `R2_BUCKET` · `RESEND_API_KEY` ·
-`FINANCE_NOTIFICATION_EMAIL` · `RECEIPT_BACKUP_EMAIL` · `RECEIPT_MAIL_FROM` ·
+`FINANCE_NOTIFICATION_EMAIL` · `MONTHLY_SUBMISSION_EMAIL` ·
+`MONTHLY_SUBMISSION_TEST_EMAIL` · `RECEIPT_BACKUP_EMAIL` · `RECEIPT_MAIL_FROM` ·
 `SUBMISSION_MAIL_FROM`. Modèle complet dans `.env.example`.
 
 ---
