@@ -2,6 +2,7 @@ const { sendJson, readJson, methodNotAllowed, getQuery } = require('./_lib/http'
 const { requireSession } = require('./_lib/auth');
 const { sql, ensureSchema, toDbExpense, normalizeReceiptItems } = require('./_lib/db');
 const { receiptItemsFromRow, newReceiptItems, sendReceiptBackupEmails } = require('./_lib/receipt-email');
+const { deleteObject } = require('./_lib/r2');
 
 const ALLOWED_UPDATE_FIELDS = new Set([
   'date',
@@ -178,7 +179,23 @@ async function deleteExpense(req, res, session) {
     ? await sql()`delete from expenses where id = ${id} returning *`
     : await sql()`delete from expenses where id = ${id} and app_channel = ${session.app_channel} returning *`;
   if (rows.length === 0) return sendJson(res, 404, { ok: false, error: 'Expense not found' });
-  return sendJson(res, 200, { ok: true, data: rows[0] });
+
+  // Supprimer aussi les justificatifs du stockage. Sans ca ils restent dans R2
+  // sans que plus rien ne les reference : ni l'app ni /api/receipts ne peuvent
+  // les atteindre, puisque l'acces exige une ligne en base. On le fait apres le
+  // DELETE, qui renvoie la ligne et donc les chemins ; un echec de suppression
+  // de fichier ne doit pas annuler la suppression du frais.
+  const orphaned = receiptItemsFromRow(rows[0]).map(item => item.path).filter(Boolean);
+  const receiptCleanup = { removed: 0, failed: [] };
+  for (const path of orphaned) {
+    try {
+      await deleteObject(path);
+      receiptCleanup.removed += 1;
+    } catch (error) {
+      receiptCleanup.failed.push(path);
+    }
+  }
+  return sendJson(res, 200, { ok: true, data: rows[0], receiptCleanup });
 }
 
 function lastDayOfMonth(month) {
