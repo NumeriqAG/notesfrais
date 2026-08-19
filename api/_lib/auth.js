@@ -1,10 +1,10 @@
 const crypto = require('crypto');
+const { sql } = require('./db');
 
 const COOKIE_NAME = 'notesfrais_session';
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_FAILURES = 8;
-const loginFailures = new Map();
 
 function cookieSecret() {
   const secret = process.env.NOTESFRAIS_COOKIE_SECRET;
@@ -20,6 +20,18 @@ function base64url(input) {
 
 function sign(value) {
   return crypto.createHmac('sha256', cookieSecret()).update(value).digest('base64url');
+}
+
+// Comparaison a duree constante : un !== classique revele la position du
+// premier octet different par son temps de retour.
+function safeEqual(a, b) {
+  const bufA = Buffer.from(String(a || ''), 'utf8');
+  const bufB = Buffer.from(String(b || ''), 'utf8');
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 function parseCookies(req) {
@@ -49,34 +61,45 @@ function loginKey(req, email) {
   return `${ip}:${String(email || '').trim().toLowerCase()}`;
 }
 
-function checkLoginRateLimit(req, email) {
-  const key = loginKey(req, email);
-  const now = Date.now();
-  const entry = loginFailures.get(key);
-  if (!entry || entry.resetAt <= now) {
-    loginFailures.set(key, { count: 0, resetAt: now + LOGIN_WINDOW_MS });
-    return;
+// Persistee en base : l'ancienne Map vivait dans la memoire du process. Sur
+// Vercel, chaque demarrage a froid la remettait a zero et chaque instance avait
+// la sienne — la limitation ne protegeait donc rien en pratique.
+let rateLimitReady;
+async function ensureRateLimitTable() {
+  if (!rateLimitReady) {
+    rateLimitReady = sql()`create table if not exists login_attempts (
+      key text primary key,
+      count integer not null default 0,
+      reset_at timestamptz not null
+    )`;
   }
-  if (entry.count >= LOGIN_MAX_FAILURES) {
+  await rateLimitReady;
+}
+
+async function checkLoginRateLimit(req, email) {
+  await ensureRateLimitTable();
+  const [row] = await sql()`select count from login_attempts
+    where key = ${loginKey(req, email)} and reset_at > now()`;
+  if (row && row.count >= LOGIN_MAX_FAILURES) {
     const error = new Error('Too many login attempts. Try again later.');
     error.statusCode = 429;
     throw error;
   }
 }
 
-function recordLoginFailure(req, email) {
-  const key = loginKey(req, email);
-  const now = Date.now();
-  const entry = loginFailures.get(key);
-  if (!entry || entry.resetAt <= now) {
-    loginFailures.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
-    return;
-  }
-  entry.count += 1;
+async function recordLoginFailure(req, email) {
+  await ensureRateLimitTable();
+  const windowEnd = new Date(Date.now() + LOGIN_WINDOW_MS).toISOString();
+  await sql()`insert into login_attempts (key, count, reset_at)
+    values (${loginKey(req, email)}, 1, ${windowEnd})
+    on conflict (key) do update set
+      count = case when login_attempts.reset_at > now() then login_attempts.count + 1 else 1 end,
+      reset_at = case when login_attempts.reset_at > now() then login_attempts.reset_at else ${windowEnd}::timestamptz end`;
 }
 
-function clearLoginFailures(req, email) {
-  loginFailures.delete(loginKey(req, email));
+async function clearLoginFailures(req, email) {
+  await ensureRateLimitTable();
+  await sql()`delete from login_attempts where key = ${loginKey(req, email)}`;
 }
 
 function makeSession(profile) {
@@ -95,7 +118,7 @@ function readSession(req) {
   const raw = parseCookies(req)[COOKIE_NAME];
   if (!raw) return null;
   const [body, mac] = raw.split('.');
-  if (!body || !mac || sign(body) !== mac) return null;
+  if (!body || !mac || !safeEqual(sign(body), mac)) return null;
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
     if (!payload.exp || payload.exp < Date.now()) return null;
@@ -109,7 +132,22 @@ function clearCookie() {
   return serializeCookie('', 0);
 }
 
+// Deux facons de declarer les comptes, dans cet ordre de priorite :
+//
+// 1. NOTESFRAIS_USERS : un tableau JSON, autant de comptes qu'on veut, avec
+//    soit "password" en clair, soit "passwordHash" au format
+//    scrypt$<sel base64>$<empreinte base64> — genere par
+//    `node scripts/hash-password.mjs`.
+//    [{"email":"mike@x.ch","passwordHash":"scrypt$...","role":"user","app_channel":"mike"}]
+//
+// 2. Les quatre variables historiques NOTESFRAIS_USER_* / NOTESFRAIS_FINANCE_*,
+//    conservees pour ne rien casser.
+//
+// Une vraie table utilisateurs reste l'objectif : ces comptes n'ont ni
+// revocation, ni trace de qui fait quoi.
 function profilesFromEnv() {
+  const declared = parseUsersEnv();
+  if (declared.length > 0) return declared;
   return [
     {
       id: 'mike',
@@ -128,11 +166,46 @@ function profilesFromEnv() {
   ].filter(profile => profile.email && profile.password);
 }
 
+function parseUsersEnv() {
+  const raw = process.env.NOTESFRAIS_USERS;
+  if (!raw) return [];
+  let list;
+  try {
+    list = JSON.parse(raw);
+  } catch (_error) {
+    throw new Error('NOTESFRAIS_USERS is not valid JSON');
+  }
+  if (!Array.isArray(list)) throw new Error('NOTESFRAIS_USERS must be a JSON array');
+  return list
+    .map((item, index) => ({
+      id: String(item.id || item.email || `user${index}`),
+      email: String(item.email || '').trim(),
+      password: item.password ? String(item.password) : '',
+      passwordHash: item.passwordHash ? String(item.passwordHash) : '',
+      role: item.role === 'finance' ? 'finance' : 'user',
+      app_channel: item.app_channel === 'all' ? 'all' : item.app_channel === 'test' ? 'test' : 'mike'
+    }))
+    .filter(item => item.email && (item.password || item.passwordHash));
+}
+
+// scrypt$<sel base64>$<empreinte base64>
+function verifyPasswordHash(password, stored) {
+  const [scheme, saltB64, hashB64] = String(stored || '').split('$');
+  if (scheme !== 'scrypt' || !saltB64 || !hashB64) return false;
+  const expected = Buffer.from(hashB64, 'base64');
+  const actual = crypto.scryptSync(String(password || ''), Buffer.from(saltB64, 'base64'), expected.length);
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
 function authenticate(email, password) {
   const normalized = String(email || '').trim().toLowerCase();
   const profile = profilesFromEnv().find(item => item.email.toLowerCase() === normalized);
-  if (!profile || String(password || '') !== profile.password) return null;
-  const { password: _password, ...safeProfile } = profile;
+  if (!profile) return null;
+  const valid = profile.passwordHash
+    ? verifyPasswordHash(password, profile.passwordHash)
+    : safeEqual(password, profile.password);
+  if (!valid) return null;
+  const { password: _password, passwordHash: _hash, ...safeProfile } = profile;
   return safeProfile;
 }
 

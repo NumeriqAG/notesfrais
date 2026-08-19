@@ -23,13 +23,13 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'POST') {
       const body = await readJson(req);
-      checkLoginRateLimit(req, body.email);
+      await checkLoginRateLimit(req, body.email);
       const profile = authenticate(body.email, body.password);
       if (!profile) {
-        recordLoginFailure(req, body.email);
+        await recordLoginFailure(req, body.email);
         return sendJson(res, 401, { ok: false, error: 'Email ou mot de passe incorrect' });
       }
-      clearLoginFailures(req, body.email);
+      await clearLoginFailures(req, body.email);
       res.setHeader('Set-Cookie', serializeCookie(makeSession(profile)));
       return sendJson(res, 200, {
         ok: true,

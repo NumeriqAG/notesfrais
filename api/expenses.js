@@ -133,46 +133,32 @@ async function updateExpenses(req, res, session) {
 
 async function updateRows(ids, updates) {
   const db = sql();
-  const receiptItems = updates.receipt_items === undefined ? undefined : normalizeReceiptItems(updates.receipt_items);
-  const set = {
-    date: updates.date,
-    merchant: updates.merchant,
-    amount: updates.amount == null ? undefined : Number(updates.amount),
-    amount_chf: updates.amount_chf == null ? undefined : Number(updates.amount_chf),
-    tva: updates.tva == null ? undefined : Number(updates.tva),
-    category: updates.category,
-    currency: updates.currency,
-    note: updates.note,
-    status: updates.status,
-    ubs_label: updates.ubs_label,
-    ubs_date: updates.ubs_date,
-    amt_diff: updates.amt_diff,
-    receipt_url: updates.receipt_url,
-    receipt_name: updates.receipt_name,
-    receipt_items: receiptItems === undefined ? undefined : JSON.stringify(receiptItems),
-    app_channel: updates.app_channel,
-    submission_status: updates.submission_status,
-    submitted_at: updates.submitted_at
-  };
+  // coalesce(valeur, colonne) rendait impossible de remettre un champ a NULL :
+  // on ne pouvait donc pas detacher un justificatif d'une depense. Le motif
+  // "case when <fourni> then <valeur> else <colonne> end" distingue « champ
+  // absent de la requete » de « champ explicitement vide ».
+  const has = key => Object.prototype.hasOwnProperty.call(updates, key);
+  const num = key => (has(key) && updates[key] !== null && updates[key] !== '' ? Number(updates[key]) : null);
+  const items = has('receipt_items') ? JSON.stringify(normalizeReceiptItems(updates.receipt_items)) : null;
   return db`update expenses set
-    date = coalesce(${set.date}, date),
-    merchant = coalesce(${set.merchant}, merchant),
-    amount = coalesce(${set.amount}, amount),
-    amount_chf = coalesce(${set.amount_chf}, amount_chf),
-    tva = coalesce(${set.tva}, tva),
-    category = coalesce(${set.category}, category),
-    currency = coalesce(${set.currency}, currency),
-    note = coalesce(${set.note}, note),
-    status = coalesce(${set.status}, status),
-    ubs_label = coalesce(${set.ubs_label}, ubs_label),
-    ubs_date = coalesce(${set.ubs_date}, ubs_date),
-    amt_diff = coalesce(${set.amt_diff}, amt_diff),
-    receipt_url = coalesce(${set.receipt_url}, receipt_url),
-    receipt_name = coalesce(${set.receipt_name}, receipt_name),
-    receipt_items = coalesce(${set.receipt_items}::jsonb, receipt_items),
-    app_channel = coalesce(${set.app_channel}, app_channel),
-    submission_status = coalesce(${set.submission_status}, submission_status),
-    submitted_at = coalesce(${set.submitted_at}, submitted_at)
+    date = case when ${has('date')} then ${updates.date ?? null}::date else date end,
+    merchant = case when ${has('merchant')} then ${updates.merchant ?? null}::text else merchant end,
+    amount = case when ${has('amount')} then ${num('amount')}::numeric else amount end,
+    amount_chf = case when ${has('amount_chf')} then ${num('amount_chf')}::numeric else amount_chf end,
+    tva = case when ${has('tva')} then ${num('tva')}::numeric else tva end,
+    category = case when ${has('category')} then ${updates.category ?? null}::text else category end,
+    currency = case when ${has('currency')} then ${updates.currency ?? null}::text else currency end,
+    note = case when ${has('note')} then ${updates.note ?? null}::text else note end,
+    status = case when ${has('status')} then ${updates.status ?? null}::text else status end,
+    ubs_label = case when ${has('ubs_label')} then ${updates.ubs_label ?? null}::text else ubs_label end,
+    ubs_date = case when ${has('ubs_date')} then ${updates.ubs_date || null}::date else ubs_date end,
+    amt_diff = case when ${has('amt_diff')} then ${num('amt_diff')}::numeric else amt_diff end,
+    receipt_url = case when ${has('receipt_url')} then ${updates.receipt_url ?? null}::text else receipt_url end,
+    receipt_name = case when ${has('receipt_name')} then ${updates.receipt_name ?? null}::text else receipt_name end,
+    receipt_items = case when ${has('receipt_items')} then ${items}::jsonb else receipt_items end,
+    app_channel = case when ${has('app_channel')} then ${updates.app_channel ?? null}::text else app_channel end,
+    submission_status = case when ${has('submission_status')} then ${updates.submission_status ?? null}::text else submission_status end,
+    submitted_at = case when ${has('submitted_at')} then ${updates.submitted_at || null}::timestamptz else submitted_at end
     where id = any(${ids})
     returning *`;
 }

@@ -67,8 +67,14 @@ async function streamReceipt(res, path, name) {
 async function removeReceipt(req, res, session) {
   const body = await readJson(req);
   const paths = Array.isArray(body.paths) ? body.paths : [body.path].filter(Boolean);
+  // La lecture verifie le prefixe de chemin ET l'appartenance en base ; la
+  // suppression doit en faire autant. canUsePath seul laissait passer tout
+  // chemin sans '/', c'est-a-dire les anciens justificatifs stockes a la
+  // racine, quel que soit leur canal.
   for (const path of paths) {
-    if (!canUsePath(path, session)) return sendJson(res, 403, { ok: false, error: 'Receipt not accessible' });
+    if (!await canAccessReceipt(path, session)) {
+      return sendJson(res, 403, { ok: false, error: 'Receipt not accessible' });
+    }
   }
   await Promise.all(paths.map(path => deleteObject(path)));
   return sendJson(res, 200, { ok: true });
