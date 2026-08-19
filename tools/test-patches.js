@@ -139,6 +139,8 @@ const REQUIRED = {
     ['justificatifs via l API R2', '/api/receipts'],
     ['soumission mensuelle', '/api/monthly-submission'],
     ['justificatifs multiples', 'receiptItems'],
+    ['dates normalisees en AAAA-MM-JJ', 'function nfNormalizeData('],
+    ['normalisation appliquee aux lectures', 'nfNormalizeData(out.data||[])'],
     ['edition d un frais', 'setEditingExpense'],
     ['file d attente hors ligne', 'function queueOfflineExpense('],
     ['OCR avec pretraitement image', 'function preprocessReceiptImage('],

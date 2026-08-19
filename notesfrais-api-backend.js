@@ -102,6 +102,27 @@ function notesFraisFilterParams(filters){
   if(lte)params.set('to',lte.value);
   return params;
 }
+function nfIsoDay(value){
+  if(!value)return value;
+  if(value instanceof Date)return value.toISOString().slice(0,10);
+  const text=String(value);
+  return /^\d{4}-\d{2}-\d{2}T/.test(text)?text.slice(0,10):text;
+}
+function nfNormalizeRow(row){
+  if(!row||typeof row!=='object')return row;
+  const out={...row};
+  if('date' in out)out.date=nfIsoDay(out.date);
+  if('ubs_date' in out)out.ubs_date=nfIsoDay(out.ubs_date);
+  return out;
+}
+// Neon renvoie les colonnes 'date' en horodatage ISO complet, la ou Supabase
+// renvoyait 'AAAA-MM-JJ'. Le front compare ces dates comme des CHAINES : un
+// frais du dernier jour du mois echouait le test date<=periodEnd et
+// disparaissait de la vue, du total et de la soumission.
+function nfNormalizeData(data){
+  if(Array.isArray(data))return data.map(nfNormalizeRow);
+  return nfNormalizeRow(data);
+}
 function makeNotesFraisBuilder(table){
   const state={table,action:'select',filters:[],values:null,single:false,maybeSingle:false};
   const builder={
@@ -129,12 +150,12 @@ function makeNotesFraisBuilder(table){
         if(state.action==='select'){
           const params=notesFraisFilterParams(state.filters);
           const out=await notesFraisApi('/api/expenses?'+params.toString());
-          return {data:out.data||[],error:null};
+          return {data:nfNormalizeData(out.data||[]),error:null};
         }
         if(state.action==='insert'){
           const value=Array.isArray(state.values)?state.values[0]:state.values;
           const out=await notesFraisApi('/api/expenses',{method:'POST',body:JSON.stringify(value)});
-          return {data:out.data,error:null};
+          return {data:nfNormalizeData(out.data),error:null};
         }
         if(state.action==='update'){
           const idFilter=state.filters.find(f=>f.op==='eq'&&f.column==='id');
@@ -143,13 +164,13 @@ function makeNotesFraisBuilder(table){
           if(idFilter)payload.id=idFilter.value;
           if(inFilter)payload.ids=inFilter.values;
           const out=await notesFraisApi('/api/expenses',{method:'PATCH',body:JSON.stringify(payload)});
-          return {data:out.data,error:null};
+          return {data:nfNormalizeData(out.data),error:null};
         }
         if(state.action==='delete'){
           const idFilter=state.filters.find(f=>f.op==='eq'&&f.column==='id');
           const params=new URLSearchParams({id:String(idFilter&&idFilter.value||'')});
           const out=await notesFraisApi('/api/expenses?'+params.toString(),{method:'DELETE'});
-          return {data:out.data,error:null};
+          return {data:nfNormalizeData(out.data),error:null};
         }
       }catch(error){
         return {data:null,error};
