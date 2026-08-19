@@ -80,29 +80,29 @@
 
   /* ── En-tete : grand titre qui se compacte au defilement ─────────── */
   body.nf-ios-mike #nf-ios-header{
-    padding:calc(11px + env(safe-area-inset-top)) 20px 10px!important;
+    padding:calc(9px + env(safe-area-inset-top)) 18px 9px!important;
     margin:0 -16px 14px!important;
     background:rgba(242,242,247,.86)!important;
     align-items:flex-end!important;
     transition:padding .18s ease;
   }
   body.nf-ios-mike #nf-ios-header .nf-ios-kicker{
-    font-size:11px!important;font-weight:700!important;letter-spacing:.06em!important;
+    font-size:10px!important;font-weight:700!important;letter-spacing:.06em!important;
     color:var(--nfm-t3)!important;margin-bottom:2px!important;
   }
   body.nf-ios-mike #nf-ios-header .nf-ios-title{
-    font-size:32px!important;font-weight:700!important;letter-spacing:-.02em!important;
+    font-size:27px!important;font-weight:700!important;letter-spacing:-.022em!important;
     line-height:1.05!important;color:#000!important;transition:font-size .18s ease;
   }
   body.nf-ios-mike #nf-ios-header.nfm-compact{padding-top:calc(7px + env(safe-area-inset-top))!important;padding-bottom:8px!important}
-  body.nf-ios-mike #nf-ios-header.nfm-compact .nf-ios-title{font-size:19px!important}
-  body.nf-ios-mike #nf-ios-header.nfm-compact .nf-ios-kicker{font-size:10px!important}
+  body.nf-ios-mike #nf-ios-header.nfm-compact .nf-ios-title{font-size:17px!important}
+  body.nf-ios-mike #nf-ios-header.nfm-compact .nf-ios-kicker{font-size:9.5px!important}
   /* Pastille de compte : l'initiale, pas le nom complet. */
   body.nf-ios-mike #nf-ios-header .nf-ios-profile{
-    width:34px!important;height:34px!important;border-radius:17px!important;
+    width:30px!important;height:30px!important;border-radius:15px!important;
     background:var(--nfm-accent)!important;color:#fff!important;font-size:0!important;flex:none;
   }
-  body.nf-ios-mike #nf-ios-header .nf-ios-profile:before{content:"M";font-size:13px;font-weight:700}
+  body.nf-ios-mike #nf-ios-header .nf-ios-profile:before{content:"M";font-size:12px;font-weight:700}
 
   /* ── Ordre de lecture de l'onglet Expenses ───────────────────────── */
   body.nf-ios-mike [data-nfm-expenses]{display:flex!important;flex-direction:column!important}
@@ -115,34 +115,34 @@
   /* ── Recapitulatif du mois ───────────────────────────────────────── */
   body.nf-ios-mike [data-user-submit-placement]{
     background:#fff!important;border:0!important;border-radius:16px!important;
-    box-shadow:var(--nfm-hair)!important;padding:18px 18px 14px!important;
-    margin-bottom:16px!important;display:block!important;
+    box-shadow:var(--nfm-hair)!important;padding:15px 16px 13px!important;
+    margin-bottom:14px!important;display:block!important;
   }
   body.nf-ios-mike .nfm-sum-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-  body.nf-ios-mike .nfm-sum-label{font-size:12px;font-weight:600;color:var(--nfm-t3);letter-spacing:.02em}
+  body.nf-ios-mike .nfm-sum-label{font-size:11px;font-weight:600;color:var(--nfm-t3);letter-spacing:.02em}
   /* « CHF 12'480.55 » doit tenir sur une ligne, y compris sur un iPhone SE. */
   body.nf-ios-mike .nfm-sum-total{
-    font-size:clamp(28px,9vw,38px);font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:4px;
+    font-size:clamp(25px,7.7vw,31px);font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:3px;
     font-variant-numeric:tabular-nums;color:#000;white-space:nowrap;
   }
   body.nf-ios-mike .nfm-badge{
-    flex:none;padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap;
+    flex:none;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;
   }
   body.nf-ios-mike .nfm-badge-open{background:var(--nfm-accent-l);color:var(--nfm-accent)}
   body.nf-ios-mike .nfm-badge-closed{background:var(--nfm-gl);color:var(--nfm-green)}
   body.nf-ios-mike .nfm-sum-grid{
-    display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px;padding-top:16px;border-top:var(--nfm-sep);
+    display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:15px;padding-top:13px;border-top:var(--nfm-sep);
   }
-  body.nf-ios-mike .nfm-sum-k{font-size:12px;color:var(--nfm-t3);font-weight:500}
-  body.nf-ios-mike .nfm-sum-v{font-size:19px;font-weight:650;margin-top:3px;font-variant-numeric:tabular-nums}
-  body.nf-ios-mike .nfm-track{height:4px;border-radius:99px;background:#E9E9EE;margin-top:14px;overflow:hidden}
+  body.nf-ios-mike .nfm-sum-k{font-size:11px;color:var(--nfm-t3);font-weight:500}
+  body.nf-ios-mike .nfm-sum-v{font-size:17px;font-weight:650;margin-top:3px;font-variant-numeric:tabular-nums}
+  body.nf-ios-mike .nfm-track{height:4px;border-radius:99px;background:#E9E9EE;margin-top:12px;overflow:hidden}
   body.nf-ios-mike .nfm-track>i{display:block;height:100%;border-radius:99px;background:var(--nfm-accent)}
-  body.nf-ios-mike .nfm-sum-note{font-size:13px;line-height:1.45;color:var(--nfm-t2);margin-top:14px}
+  body.nf-ios-mike .nfm-sum-note{font-size:12.5px;line-height:1.45;color:var(--nfm-t2);margin-top:12px}
   /* Le bouton de soumission reel, restyle — la logique n'est pas touchee. */
   body.nf-ios-mike [data-user-submit-placement]>button{
-    width:100%!important;min-width:0!important;min-height:50px!important;margin-top:16px!important;
-    border:0!important;border-radius:14px!important;background:var(--nfm-accent)!important;color:#fff!important;
-    font-size:17px!important;font-weight:600!important;letter-spacing:-.01em!important;justify-content:center!important;
+    width:100%!important;min-width:0!important;min-height:46px!important;margin-top:14px!important;
+    border:0!important;border-radius:13px!important;background:var(--nfm-accent)!important;color:#fff!important;
+    font-size:16px!important;font-weight:600!important;letter-spacing:-.01em!important;justify-content:center!important;
     box-shadow:none!important;
   }
   body.nf-ios-mike [data-user-submit-placement]>button:disabled{
@@ -169,7 +169,24 @@
   body.nf-ios-mike .nfm-banner-closed .nfm-banner-s{color:#0F5544;margin-top:0}
 
   /* ── Periode, recherche, filtres ─────────────────────────────────── */
-  body.nf-ios-mike .nf-ios-period-header{margin:0 0 10px!important}
+  /* Le conteneur fait 361px mais sa piste de grille se calait sur le contenu :
+     le selecteur et le segmente s'arretaient a 205px, la ou la maquette les
+     veut pleine largeur. */
+  body.nf-ios-mike .nf-ios-period-header{margin:0 0 10px!important;grid-template-columns:minmax(0,1fr)!important;justify-items:stretch!important}
+  body.nf-ios-mike .nf-ios-period-header>div:last-child,
+  body.nf-ios-mike .nf-ios-period-header [data-period-selector="true"],
+  body.nf-ios-mike .nf-ios-period-header [data-period-selector="true"]>div:first-child,
+  body.nf-ios-mike .nf-ios-period-header select{width:100%!important;min-width:0!important;max-width:none!important}
+  /* Le <select> gardait la fleche du systeme et son texte centre : il lisait
+     comme un formulaire, pas comme une rangee de reglages iOS. On garde le
+     controle natif — c'est lui qui ouvre la roulette iOS — et on lui donne
+     l'apparence d'une rangee a chevron. */
+  body.nf-ios-mike .nf-ios-period-header select{
+    -webkit-appearance:none!important;appearance:none!important;
+    background:#fff url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%228%22%20height%3D%2213%22%20viewBox%3D%220%200%208%2013%22%3E%3Cpath%20d%3D%22M1.4%201.4%206.5%206.5%201.4%2011.6%22%20fill%3D%22none%22%20stroke%3D%22%23C3C3C7%22%20stroke-width%3D%221.9%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E") no-repeat right 15px center!important;
+    padding:0 38px 0 15px!important;text-align:left!important;color:#000!important;
+    font-size:16px!important;font-weight:500!important;
+  }
   body.nf-ios-mike .nf-ios-period-header [data-period-selector="true"]>div:first-child{
     background:#E3E3E8!important;border-radius:10px!important;
   }
@@ -177,14 +194,14 @@
     background:#fff!important;color:#000!important;
   }
   body.nf-ios-mike .nf-ios-period-header select{
-    border-radius:14px!important;box-shadow:var(--nfm-hair)!important;height:50px!important;
+    border-radius:13px!important;box-shadow:var(--nfm-hair)!important;height:44px!important;
   }
   body.nf-ios-mike .nf-ios-search{
-    background:#E3E3E8!important;border-radius:12px!important;height:44px!important;font-size:16px!important;
+    background:#E3E3E8!important;border-radius:11px!important;height:40px!important;font-size:16px!important;
   }
-  body.nf-ios-mike .nf-ios-filters{margin:12px -16px 16px!important;padding:2px 16px 6px!important}
+  body.nf-ios-mike .nf-ios-filters{margin:10px -16px 14px!important;padding:2px 16px 6px!important}
   body.nf-ios-mike .nf-ios-filters button{
-    border-radius:17px!important;padding:7px 14px!important;font-size:13.5px!important;font-weight:600!important;
+    border-radius:16px!important;padding:6px 13px!important;font-size:12.5px!important;font-weight:600!important;
     background:#fff!important;color:var(--nfm-t2)!important;box-shadow:0 0 0 .5px rgba(60,60,67,.16)!important;
   }
   body.nf-ios-mike .nf-ios-filters button.nf-ios-selected,
@@ -201,17 +218,17 @@
     background:#fff!important;border:0!important;border-radius:16px!important;overflow:hidden!important;
     box-shadow:var(--nfm-hair)!important;
   }
-  body.nf-ios-mike .nf-ios-expense-list>div{padding:12px 14px!important;background:#fff!important}
+  body.nf-ios-mike .nf-ios-expense-list>div{padding:10px 13px!important;background:#fff!important}
   body.nf-ios-mike .nf-ios-expense-list>div+div{border-top:var(--nfm-sep)!important}
   body.nf-ios-mike .nf-ios-expense-row{
-    display:grid!important;grid-template-columns:56px minmax(0,1fr) auto!important;
-    grid-template-rows:auto!important;column-gap:13px!important;row-gap:0!important;
+    display:grid!important;grid-template-columns:48px minmax(0,1fr) auto!important;
+    grid-template-rows:auto!important;column-gap:12px!important;row-gap:0!important;
     align-items:center!important;min-height:0!important;
   }
   /* La pastille de categorie disparait : la vignette est la piece. */
   body.nf-ios-mike .nf-ios-expense-row>.nf-ios-expense-icon{display:none!important}
   body.nf-ios-mike .nf-ios-expense-row>.nf-ios-expense-receipt{
-    order:1;width:56px!important;height:56px!important;border-radius:12px!important;
+    order:1;width:48px!important;height:48px!important;border-radius:12px!important;
     overflow:hidden;flex:none;position:relative;
   }
   body.nf-ios-mike .nf-ios-expense-row>.nf-ios-expense-receipt,
@@ -219,10 +236,10 @@
     border:0!important;box-shadow:inset 0 0 0 .5px rgba(60,60,67,.14)!important;background:#EFEFF3!important;
   }
   body.nf-ios-mike .nf-ios-expense-row>.nf-ios-expense-receipt>*{
-    width:56px!important;height:56px!important;border-radius:12px!important;
+    width:48px!important;height:48px!important;border-radius:12px!important;
   }
   body.nf-ios-mike .nf-ios-expense-row>.nf-ios-expense-receipt img{
-    width:56px!important;height:56px!important;object-fit:cover!important;
+    width:48px!important;height:48px!important;object-fit:cover!important;
   }
   /* Le ticket manquant est ce qui doit se remarquer : c'est la piece qui
      manquera au ZIP de fin de mois, pas un detail d'affichage.
@@ -238,7 +255,7 @@
   }
   body.nf-ios-mike .nf-ios-expense-row>.nf-ios-expense-info{order:2;min-width:0}
   body.nf-ios-mike .nf-ios-expense-info>div:first-child{
-    font-size:16px!important;font-weight:600!important;letter-spacing:-.01em!important;
+    font-size:15px!important;font-weight:600!important;letter-spacing:-.01em!important;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   /* Deux lignes de meta au plus : au-dela, chaque frais faisait 200px de haut
@@ -246,25 +263,25 @@
      plutot que d'interdire le retour a la ligne, qui tronquait les pastilles
      en plein milieu d'un mot. */
   body.nf-ios-mike .nf-ios-expense-info>div:nth-child(2){
-    font-size:13px!important;color:var(--nfm-t3)!important;margin-top:3px!important;gap:6px!important;
-    flex-wrap:wrap!important;row-gap:5px!important;overflow:hidden!important;max-height:48px!important;
+    font-size:12.5px!important;color:var(--nfm-t3)!important;margin-top:3px!important;gap:6px!important;
+    flex-wrap:wrap!important;row-gap:4px!important;overflow:hidden!important;max-height:44px!important;
   }
   /* « UBS: … » repete ce que dit deja la pastille « Matched ». */
   body.nf-ios-mike .nf-ios-expense-info>div:nth-child(3){display:none!important}
   /* La date reste du texte ; seuls le statut et la carte deviennent des pastilles. */
   body.nf-ios-mike .nf-ios-expense-info>div:nth-child(2) span:not(:first-child){
-    padding:3px 8px;border-radius:7px;font-size:11px;font-weight:600;background:#F2F2F7;color:#6B6B70;
+    padding:2px 7px;border-radius:6px;font-size:10.5px;font-weight:600;background:#F2F2F7;color:#6B6B70;
   }
   body.nf-ios-mike .nf-ios-expense-row>.nf-ios-expense-amount{
     order:3;text-align:right!important;min-width:0!important;width:auto!important;flex:none;
   }
   body.nf-ios-mike .nf-ios-expense-amount>div:first-child{
-    font-size:16px!important;font-weight:700!important;white-space:nowrap;font-variant-numeric:tabular-nums;
+    font-size:15px!important;font-weight:700!important;white-space:nowrap;font-variant-numeric:tabular-nums;
   }
   body.nf-ios-mike .nf-ios-expense-actions{
-    justify-content:flex-end!important;gap:10px!important;margin-top:7px!important;
+    justify-content:flex-end!important;gap:10px!important;margin-top:6px!important;
   }
-  body.nf-ios-mike .nf-ios-expense-actions button{font-size:13px!important;font-weight:600!important}
+  body.nf-ios-mike .nf-ios-expense-actions button{font-size:12.5px!important;font-weight:600!important}
 
   /* ── Liste vide, premier usage ─────────────────────────────────────
      Un total a CHF 0.00 n'apprend rien le premier jour : on laisse
@@ -298,40 +315,45 @@
   body.nf-ios-mike #test-scan-cta{
     display:flex!important;
     left:12px!important;right:12px!important;
-    bottom:calc(96px + env(safe-area-inset-bottom))!important;
-    border-radius:15px!important;padding:0!important;min-height:52px!important;
+    bottom:calc(84px + env(safe-area-inset-bottom))!important;
+    border-radius:14px!important;padding:0!important;min-height:48px!important;
     background:#1A3FB5!important;color:#fff!important;
-    font-size:17px!important;font-weight:650!important;letter-spacing:-.01em!important;
+    font-size:16.5px!important;font-weight:650!important;letter-spacing:-.01em!important;
     box-shadow:0 8px 22px rgba(26,63,181,.28)!important;
   }
   body.nf-ios-mike #test-scan-cta.test-hidden{display:none!important}
   body.nf-ios-mike #test-bottom-nav{
     left:0!important;right:0!important;bottom:0!important;
     border:0!important;border-top:.5px solid rgba(60,60,67,.22)!important;border-radius:0!important;
-    background:rgba(249,249,249,.9)!important;box-shadow:none!important;
-    grid-template-columns:repeat(4,1fr)!important;
-    padding:6px 0 calc(10px + env(safe-area-inset-bottom))!important;
+    background:#F7F7F8!important;box-shadow:none!important;
+    grid-template-columns:repeat(3,1fr)!important;
+    padding:5px 0 calc(8px + env(safe-area-inset-bottom))!important;
   }
   /* Le fond translucide remonte derriere le bouton bleu : sans lui, la liste
      defile dans la bande qui les separe et les deux flottent dans le vide. */
   body.nf-ios-mike #test-bottom-nav:before{
-    content:"";position:absolute;left:0;right:0;bottom:100%;height:76px;
-    background:rgba(249,249,249,.9);
-    backdrop-filter:saturate(180%) blur(22px);-webkit-backdrop-filter:saturate(180%) blur(22px);
+    content:"";position:absolute;left:0;right:0;bottom:100%;height:68px;
+    background:linear-gradient(to bottom,rgba(247,247,248,0) 0,#F7F7F8 18px,#F7F7F8 100%);
     pointer-events:none;
   }
+  /* ios-ui.js donne 58px de haut a chaque onglet, ce qui fait une barre de
+     72px la ou la maquette en tient 53. */
   body.nf-ios-mike #test-bottom-nav button{
-    color:#8E8E93!important;font-size:11px!important;font-weight:600!important;
+    color:#8E8E93!important;font-size:10.5px!important;font-weight:600!important;
+    height:44px!important;gap:1px!important;
   }
+  body.nf-ios-mike #test-bottom-nav button:before{font-size:20px!important;line-height:23px!important}
   body.nf-ios-mike #test-bottom-nav button:before{color:#8E8E93}
   body.nf-ios-mike #test-bottom-nav button.active{color:var(--nfm-accent)!important}
   body.nf-ios-mike #test-bottom-nav button.active:before{color:var(--nfm-accent)}
   /* L'onglet « Scan » ferait doublon avec le bouton bleu juste au-dessus.
      On le masque sans le retirer : arrangeTabBar() le reinjecte sinon. */
-  body.nf-ios-mike #test-bottom-nav button[data-tab="scan"]{display:none!important}
+  body.nf-ios-mike #test-bottom-nav button[data-tab="scan"],
+  body.nf-ios-mike #test-bottom-nav button[data-tab="account"]{display:none!important}
+  body.nf-ios-mike #nf-ios-header .nf-ios-profile{cursor:pointer}
   /* Rien ne doit se cacher derriere la barre : CTA (52) + barre (~68) + marges. */
   body.nf-ios-mike .nf-ios-content{
-    padding-bottom:calc(190px + env(safe-area-inset-bottom))!important;
+    padding-bottom:calc(172px + env(safe-area-inset-bottom))!important;
   }
 
   /* ── Feuille de capture ──────────────────────────────────────────── */
@@ -784,6 +806,16 @@ function tick(){
   if(!header)return;
   const top=(scroller()&&scroller().scrollTop)||window.pageYOffset||0;
   header.classList.toggle('nfm-compact',top>26);
+  const pill=header.querySelector('.nf-ios-profile');
+  if(pill&&!pill.dataset.nfmWired){
+    pill.dataset.nfmWired='1';
+    pill.setAttribute('role','button');
+    pill.setAttribute('aria-label','Account');
+    pill.addEventListener('click',function(){
+      const account=document.querySelector('#test-bottom-nav button[data-tab="account"]');
+      if(account)account.click();
+    });
+  }
   const kicker=header.querySelector('.nf-ios-kicker');
   const period=periodLabel();
   if(kicker){

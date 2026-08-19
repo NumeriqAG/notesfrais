@@ -32,6 +32,22 @@ html = html
   .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/react-dom@[^"]*/, 'vendor/react-dom.js')
   .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/@babel\/standalone@[^"]*/, 'vendor/babel.js')
   .replace(/<link href="https:\/\/fonts\.googleapis\.com[^>]*>/g, '');
+// Ce conteneur n'a que DejaVu Sans : `-apple-system` n'y resout rien et les
+// captures montrent une police bien plus large et lourde que ce qu'affichera
+// l'iPhone. On declare Inter — metriquement proche de SF Pro — sous le nom
+// « SF Pro Text », 3e de la pile CSS, pour que l'apercu ne mente pas.
+// C'est un artifice d'apercu : rien de tout cela n'est envoye en production.
+const PREVIEW_FONT = `<style>
+@font-face{font-family:"SF Pro Text";src:url("vendor/inter-latin.woff2") format("woff2");font-weight:100 900;font-display:block}
+@font-face{font-family:"SF Pro Display";src:url("vendor/inter-latin.woff2") format("woff2");font-weight:100 900;font-display:block}
+@font-face{font-family:"Segoe UI";src:url("vendor/inter-latin.woff2") format("woff2");font-weight:100 900;font-display:block}
+</style>`;
+if (existsSync('.patch-out/vendor/inter-latin.woff2')) {
+  html = html.replace('</head>', PREVIEW_FONT + '</head>');
+} else {
+  console.log('  (police d apercu absente : les captures utiliseront DejaVu, bien plus large que SF Pro)');
+  console.log('  curl -sL -o .patch-out/vendor/inter-latin.woff2 <woff2 Inter latin>');
+}
 writeFileSync('.patch-out/render.html', html);
 
 const today = '2026-08';
