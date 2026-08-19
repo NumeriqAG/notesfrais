@@ -98,7 +98,7 @@ async function collectReceipts(rows, month) {
       const content = await bodyToBuffer(object.Body);
       const original = item.name || item.path.split('/').pop() || 'receipt';
       const name = uniqueName(usedNames, [
-        String(row.date || month),
+        toISODate(row.date) || month,
         safeFileName(row.merchant || 'expense'),
         items.length > 1 ? `receipt-${index + 1}` : '',
         safeFileName(original)
@@ -123,6 +123,7 @@ function receiptItemsFor(row) {
 
 async function sendSubmissionEmail({ to, session, monthLabel, rows, totalCHF, submittedAt, zip }) {
   const isTest = session && session.app_channel === 'test';
+  const who = displayNameFor(session);
   if (!to) throw new Error('Finance email missing');
 
   const gmailUser = cleanText(process.env.GMAIL_SMTP_USER);
@@ -130,10 +131,10 @@ async function sendSubmissionEmail({ to, session, monthLabel, rows, totalCHF, su
   const from = process.env.MONTHLY_SUBMISSION_FROM ||
     process.env.RECEIPT_MAIL_FROM ||
     (gmailUser ? `NotesFrais Numeriq <${gmailUser}>` : process.env.SUBMISSION_MAIL_FROM || 'NotesFrais <onboarding@resend.dev>');
-  const subject = `${isTest ? '[PREPROD - ignorer] ' : ''}Mike submitted expenses for ${monthLabel}`;
+  const subject = `${isTest ? '[PREPROD - ignorer] ' : ''}${who} submitted expenses for ${monthLabel}`;
   const totalLabel = formatAmount(totalCHF);
   const text = [
-    `Mike submitted his expenses for ${monthLabel}.`,
+    `${who} submitted expenses for ${monthLabel}.`,
     `User: ${session.email}`,
     `Expenses: ${rows.length}`,
     `Total: CHF ${totalLabel}`,
@@ -144,7 +145,7 @@ async function sendSubmissionEmail({ to, session, monthLabel, rows, totalCHF, su
   const html = `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#1a1a1a">
       <h2 style="margin:0 0 12px">Monthly expenses submitted</h2>
-      <p>Mike submitted his expenses for <strong>${escapeHtml(monthLabel)}</strong>.</p>
+      <p>${escapeHtml(who)} submitted expenses for <strong>${escapeHtml(monthLabel)}</strong>.</p>
       <ul>
         <li>User: ${escapeHtml(session.email)}</li>
         <li>Expenses: ${rows.length}</li>
@@ -291,6 +292,30 @@ function lastDayOfMonth(month) {
 function monthLabelFor(month) {
   const [year, m] = month.split('-').map(Number);
   return new Date(year, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+
+// Neon renvoie les colonnes 'date' comme des objets Date JavaScript, la ou
+// PostgREST renvoyait des chaines 'AAAA-MM-JJ'. Sans normalisation, String(date)
+// produit "Wed Aug 19 2026 00:00:00 GMT+0000 (...)", qui occupe a lui seul la
+// longueur maximale d'un nom de fichier et evince le commerçant.
+function toISODate(value) {
+  if (!value) return '';
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text = String(value);
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : text;
+}
+
+// Nom affichable du compte qui soumet. Les comptes sont declares dans
+// NOTESFRAIS_USERS et ne portent pas de nom : on derive de l'email.
+function displayNameFor(session) {
+  const email = String((session && session.email) || '').trim();
+  const local = email.split('@')[0] || 'Utilisateur';
+  return local
+    .replace(/[._-]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ') || 'Utilisateur';
 }
 
 function cleanText(value, fallback = '') {
