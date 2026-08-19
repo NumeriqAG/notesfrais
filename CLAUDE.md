@@ -1,43 +1,37 @@
 # NotesFrais — guide de travail
 
-> **⚠ CE DOCUMENT EST EN COURS DE REECRITURE.**
-> Il décrit l'architecture **Supabase**, remplacée par **Neon + Cloudflare R2**
-> lors de la fusion de `codex/neon-backend`. Restent exacts : la mécanique de la
-> chaîne de patches (§1), les pièges (§6) et les outils (`tools/`).
-> Sont **faux** : §4 (données, auth, RLS), §3 (trois canaux — il n'en reste qu'un),
-> et une partie de §5. Se fier au code et à `MIGRATION-SUPABASE.md` en attendant.
+Application de notes de frais de **Numeriq AG** (Suisse, CHF). Mike photographie
+ses reçus, l'app les OCRise, les stocke, les réconcilie avec un relevé bancaire
+UBS, puis le mois est « soumis » à la finance qui contrôle et exporte.
 
-Application de notes de frais de **Numeriq AG** (Suisse, CHF). Un salarié
-(Mike) photographie ses reçus, l'app les OCRise, les stocke dans Supabase,
-les réconcilie avec un relevé bancaire UBS, puis le mois est « soumis » à la
-finance qui contrôle et exporte.
-
-**Il n'y a pas de build.** Pas de `package.json`, pas de bundler, pas de
-tests. React est chargé par CDN et compilé dans le navigateur par Babel
-Standalone. On déploie en poussant sur `main` (Vercel).
+**Il n'y a pas de build front.** Pas de bundler, pas de framework de test. React
+est chargé par CDN et compilé dans le navigateur par Babel Standalone. Le seul
+`package.json` sert aux fonctions serverless. On déploie en poussant sur `main`
+(Vercel).
 
 ---
 
 ## 1. L'architecture — à lire avant toute modification
 
-Le cœur de l'app est **`app.html`** : un fichier unique de ~470 lignes qui
-contient tout le React inline dans un `<script type="text/babel">`.
+Deux moitiés indépendantes.
 
-Mais **`app.html` n'est jamais servi directement**. Les pages d'entrée
-(`mike.html`, `test.html`, `index.html`) font ceci :
+### Le front : une chaîne de patches sur un fichier gelé
+
+Le cœur est **`app.html`** : un fichier unique qui contient tout le React inline
+dans un `<script type="text/babel">`. Mais **il n'est jamais servi directement**.
+`mike.html` fait ceci :
 
 ```js
 let html = await (await fetch('/app.html')).text();   // 1. le source en TEXTE
-for (const file of patchFiles) {                       // 2. chaîne de patches
+for (const file of patchFiles) {                       // 2. chaîne de 40 patches
   new Function(await (await fetch('/'+file)).text())();
 }
 html = window.patchNotesFrais(html);                   // 3. réécriture du source
 document.open(); document.write(html); document.close();// 4. exécution
 ```
 
-Chaque fichier `notesfrais-*.js` **enveloppe** `window.patchNotesFrais` en
-décorateur, et applique des `html.replace('<code source exact>', '<nouveau
-code>')` sur le texte de `app.html` :
+Chaque `notesfrais-*.js` **enveloppe** `window.patchNotesFrais` en décorateur et
+applique des `html.replace('<code source exact>', '<nouveau code>')` :
 
 ```js
 (function(){
@@ -45,79 +39,98 @@ code>')` sur le texte de `app.html` :
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;      // les patches précédents d'abord
     if (html.includes('MON_MARQUEUR_V3')) return html;  // idempotence
-    html = html.replace("<code exact de app.html>", "<remplacement>");
+    html = html.replace("<code exact>", "<remplacement>");
     return html;
   };
 })();
 ```
 
-### Conséquences directes
+**Conséquences directes :**
 
-1. **`app.html` est quasi gelé.** Presque toutes les fonctionnalités des 12
-   derniers mois vivent dans les patches. Modifier `app.html` casse
-   silencieusement les patches qui ciblaient le code d'avant.
-2. **L'ordre des patches est du code.** Un patch B qui cible du code produit
-   par un patch A doit être chargé **après** A. Cet ordre n'existe que dans
-   les tableaux `patchFiles` de `mike.html` / `test.html` / `index.html`.
-3. **Un `.replace()` qui ne matche pas ne lève aucune erreur.** Il retourne
-   la chaîne inchangée. Une espace en trop, un accent mal encodé, ou un patch
-   antérieur qui a déjà réécrit la cible → la fonctionnalité disparaît sans
-   un seul message dans la console. C'est le mode de panne n°1 de ce repo
-   (voir §8, il y a des cas réels en production aujourd'hui).
-4. Certains patches n'agissent pas sur le source mais **injectent un
-   `<script>` qui manipule le DOM en boucle** (`setInterval`). Ils ciblent
-   des éléments par leur **texte visible** — donc ils cassent quand on
-   traduit ou renomme un libellé.
+1. **`app.html` est gelé.** Presque tout vit dans les patches. Le modifier casse
+   silencieusement ceux qui ciblaient le code d'avant.
+2. **L'ordre des patches est du code.** Un patch B qui cible du code produit par
+   A doit être chargé après A. Cet ordre n'existe que dans le tableau
+   `patchFiles` de `mike.html`.
+3. **Un `.replace()` qui ne matche pas ne lève aucune erreur.** Il retourne la
+   chaîne inchangée. Une espace en trop, un accent mal encodé, un patch antérieur
+   qui a déjà réécrit la cible → la fonctionnalité disparaît sans un message.
+   C'est le mode de panne n°1 du dépôt.
+4. Certains patches n'agissent pas sur le source mais **injectent un `<script>`
+   qui manipule le DOM en boucle** (`setInterval`). Ils ciblent des éléments par
+   leur **texte visible** — donc ils cassent quand on renomme un libellé.
+
+### Le back : Vercel Functions + Neon + R2
+
+Depuis la migration (branche `codex/neon-backend`, fusionnée), il n'y a plus de
+base côté client. Le front parle à des routes serverless :
+
+| Route | Rôle |
+|---|---|
+| `POST/GET/DELETE /api/session` | Login, lecture de session, logout. Cookie signé. |
+| `GET/POST/PATCH/DELETE /api/expenses` | CRUD des frais. **Impose le canal et les droits.** |
+| `GET/POST/DELETE /api/receipts` | Upload, URL signée et suppression des justificatifs dans R2. |
+| `POST /api/monthly-submission` | Clôture le mois + email à la finance **avec les justificatifs en ZIP**. |
+| `POST /api/notify-submission` | Email de notification simple. Probablement supplanté par la route ci-dessus — à vérifier avant de s'en servir. |
+
+Le pont entre les deux moitiés est **`notesfrais-api-backend.js`**. Il remplace
+par expression régulière tout le bloc
+
+```js
+const SUPABASE_URL='…'; const SUPABASE_KEY='…';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+```
+
+par un objet `sb` **de même forme** (`.from(table).select()…`, `.storage.from()…`)
+qui route vers `/api/*`. Tout le code applicatif écrit à l'époque Supabase
+continue donc de fonctionner sans être réécrit.
+
+⚠ **`app.html` contient encore l'URL et la clé anon Supabase** (2 occurrences).
+Elles sont retirées du HTML final par ce patch — vérifié, 0 occurrence en sortie
+— mais restent du code mort dans le source. À nettoyer.
 
 ### Vérifier ses patches : `tools/check-patches.js`
 
-Comme rien ne signale un `replace()` sans effet, un harnais rejoue la chaîne
-complète hors navigateur et liste les no-op :
+Rien ne signale un `replace()` sans effet, donc un harnais rejoue la chaîne hors
+navigateur et les liste :
 
 ```bash
-node tools/check-patches.js mike   # canal Mike (prod)
-node tools/check-patches.js test   # canal test
-node tools/check-patches.js main   # racine (legacy)
+node tools/check-patches.js mike
 ```
 
-Il écrit aussi le HTML final dans `.patch-out/out-<canal>.html` — c'est
-exactement ce que le navigateur exécute. **Toujours le lancer avant de
-commiter un patch**, et grepper le résultat pour vérifier que la
-modification est bien présente. Tous les no-op ne sont pas des bugs (beaucoup
-sont des fallbacks volontaires pour d'anciennes versions) — mais un **nouveau**
-no-op sur ton patch, si.
+Il écrit le HTML final dans `.patch-out/out-mike.html` — **exactement ce que le
+navigateur exécute**. Toujours le lancer avant de commiter, et grepper le
+résultat. Tous les no-op ne sont pas des bugs (beaucoup sont des fallbacks
+volontaires) — mais un **nouveau** no-op sur ton patch, si.
 
 ### Les tests anti-régression : `tools/test-patches.js`
 
 ```bash
-node tools/test-patches.js                     # à lancer avant chaque commit
+node tools/test-patches.js                     # avant chaque commit
 node tools/test-patches.js --update-baseline   # si une évolution est voulue
 ```
 
-C'est le seul filet de sécurité du repo. Il vérifie :
+Le seul filet de sécurité du dépôt. Il vérifie :
 
-1. **Listes** — chaque patch listé existe ; `SHELL_FILES` du SW est aligné sur
-   la liste HTML de son canal ; aucun `notesfrais-*.js` orphelin sur le disque.
-2. **Exécution** — la chaîne tourne sans exception sur les 3 canaux et produit
-   un HTML complet.
-3. **Fonctionnalités** — ~30 marqueurs vérifiés dans le HTML généré (AccessGate,
-   URLs signées, file offline, OCR, dashboard finance, export ZIP, nav mobile,
-   12 mois, UI anglaise sur mike…), plus des interdits : aucun code d'accès en
-   dur, aucun `getPublicUrl` (le bucket est privé).
+1. **Listes** — chaque patch listé existe ; `SHELL_FILES` de `mike-sw.js` est
+   aligné sur `mike.html` ; aucun `notesfrais-*.js` orphelin ; `index.html` et
+   `iphone-fix.html` sont des copies conformes de `mike.html`.
+2. **Exécution** — la chaîne tourne sans exception et produit un HTML complet.
+3. **Fonctionnalités** — une vingtaine de marqueurs dans le HTML généré (routes
+   API, OCR, hors ligne, dashboard finance, export ZIP, nav mobile, édition,
+   justificatifs multiples, confirmation de suppression…), plus des interdits :
+   aucun code d'accès en dur, plus aucun client Supabase.
 4. **Baseline** (`tools/patch-baseline.json`) — le nombre de `replace()` sans
-   effet **par fichier et par canal** ne doit jamais augmenter, ni le nombre de
-   séquences mojibake par fichier.
+   effet **par fichier** ne doit jamais augmenter, ni le mojibake par fichier.
 5. **Compilation JSX** — le script généré est réellement compilé avec la version
    exacte de Babel Standalone chargée en production. C'est la vérification la
    plus forte du dépôt : un patch qui produit du JSX invalide rend l'application
-   entièrement blanche. Le bundle (2,8 Mo) n'est pas versionné — il est
-   téléchargé une fois dans `.patch-out/`, et le test est sauté sans échouer si
-   le réseau est absent.
+   entièrement blanche. Le bundle (2,8 Mo) n'est pas versionné — téléchargé une
+   fois dans `.patch-out/`, et le test est sauté sans échouer si le réseau manque.
 
-Le point 4 est celui qui attrape la panne caractéristique du projet. Exemple
-réel : ajouter une espace dans une chaîne cible de `test-compress.js` laisse
-tous les marqueurs fonctionnels au vert, mais fait échouer la baseline sur
-2 canaux. Les deux couches sont complémentaires — ne pas en retirer une.
+Le point 4 attrape la panne caractéristique du projet : ajouter une espace dans
+une chaîne cible laisse tous les marqueurs au vert mais fait échouer la baseline.
+Les deux couches sont complémentaires — ne pas en retirer une.
 
 ---
 
@@ -125,357 +138,277 @@ tous les marqueurs fonctionnels au vert, mais fait échouer la baseline sur
 
 | Fichier | Rôle |
 |---|---|
-| `app.html` | Le socle React. Composants : `App`, `AddModal`, `UBSModal`, `ReceiptViewer`, `Thumb`, `Badge`, `StatsTab` (stub). Parseur CSV UBS + moteur de réconciliation. |
-| `mike.html` / `test.html` / `index.html` | Pages d'entrée = **liste ordonnée des patches** par canal. |
-| `iphone-fix.html` | Copie conforme d'`index.html`. C'est ce que `/` sert réellement (via `vercel.json`). |
-| `notesfrais-*.js` | Les patches (§5). |
-| `mike-sw.js` / `test-sw.js` / `sw.js` | Service workers, un par canal. |
-| `manifest*.webmanifest` | Manifests PWA, un par canal. |
-| `api/notify-submission.js` | Seule fonction serverless : mail à la finance via Resend. |
-| `supabase-*.sql` | Migrations à passer à la main dans le SQL Editor Supabase. |
-| `tools/check-patches.js` | Harnais : rejoue la chaîne, liste les `replace()` sans effet. |
-| `tools/test-patches.js` | Tests anti-régression. À lancer avant chaque commit. |
-| `tools/patch-baseline.json` | Baseline des no-op et du mojibake connus. |
-| `tools/audit-rls.sql` | Audit de sécurité, à coller dans le SQL Editor Supabase. |
-| `tools/probe-anon.sh` | Ce qu'un visiteur non authentifié obtient réellement. |
-| `icon.svg`, `logo-numeriq-payroll.png` | Assets. |
+| `app.html` | Le socle React. `App`, `AddModal`, `UBSModal`, `ReceiptViewer`, `Thumb`, `Badge`, `StatsTab`. Parseur CSV UBS + moteur de réconciliation. |
+| `mike.html` | Page d'entrée = **liste ordonnée des 40 patches**. |
+| `index.html`, `iphone-fix.html` | Replis, copies conformes de `mike.html` (un test l'impose). `vercel.json` sert `mike.html` sur `/`. |
+| `notesfrais-*.js` | Les patches (§4). |
+| `mike-sw.js` | Service worker. |
+| `api/*.js` | Les routes serverless. |
+| `api/_lib/auth.js` | Cookie signé, comptes, limitation des tentatives. |
+| `api/_lib/db.js` | Client Neon, normalisation des frais. |
+| `api/_lib/r2.js` | Stockage Cloudflare R2. |
+| `api/_lib/receipt-email.js` | Copie des reçus par email. |
+| `db/schema.sql` | Schéma Postgres. |
+| `scripts/hash-password.mjs` | Génère une empreinte pour `NOTESFRAIS_USERS`. |
+| `tools/check-patches.js` | Rejoue la chaîne, liste les `replace()` sans effet. |
+| `tools/test-patches.js` | Tests anti-régression. **Avant chaque commit.** |
+| `MIGRATION-SUPABASE.md` | Journal de la migration, écrit par Codex. |
 
 ---
 
-## 3. Les trois canaux
+## 3. Données, auth et droits
 
-`vercel.json` réécrit `/mike` → `mike.html`, `/test` → `test.html`,
-`/` → `iphone-fix.html`.
+### Base Neon
+Un seul client, `api/_lib/db.js`. `ensureSchema()` applique les migrations
+légères au vol. Le schéma de référence est `db/schema.sql`.
 
-| Canal | URL | `window.NOTESFRAIS_CHANNEL` | Patches | Langue | SW |
-|---|---|---|---|---|---|
-| **mike** | `/mike` | `'mike'` | 33 | Anglais | `mike-sw.js` |
-| **test** | `/test` | `'test'` | 32 | Français | `test-sw.js` |
-| **racine** | `/` | *(undefined → `'main'`)* | 11 | Français | `sw.js` |
-
-- **`/test` est la préprod, `/mike` la prod.** Le flux normal : développer et
-  valider sur `/test`, puis promouvoir en ajoutant le patch à `mike.html` +
-  `mike-sw.js`. C'est pour ça que des patches nommés `notesfrais-test-*.js`
-  tournent en production sur Mike — **le préfixe `test-` ne veut pas dire
-  « désactivé en prod »**.
-- Beaucoup de patches s'auto-désactivent :
-  `if(!['test','mike'].includes(window.NOTESFRAIS_CHANNEL)) return html;`
-- **Le canal racine `/` est abandonné** : 11 patches sur 33, pas d'isolation
-  de canal, pas d'espace finance, pas de nav mobile, `MONTHS` figé à
-  janvier–juin 2026. Ne rien y construire ; soit on l'aligne sur `/mike`,
-  soit on redirige `/` vers `/mike`.
-
----
-
-## 4. Données, auth et rôles
-
-### Supabase
-Projet `zxbhfcihivgihytmxczl`. L'URL et la **clé anon** sont en dur dans
-`app.html` — c'est normal, elle est publique par conception. **Toute la
-sécurité repose sur les RLS**, jamais sur le code client.
-
-**Table `expenses`**
-`id, date, merchant, amount, amount_chf, tva, category, currency, status
-('pending'|'reconciled'), note, ubs_label, ubs_date, amt_diff, receipt_url
-(en fait un *chemin* storage, cf. plus bas), receipt_name, app_channel
+**Table `expenses`** — `id, created_at, date, merchant, amount, amount_chf, tva,
+category, currency, status ('pending'|'reconciled'), note, ubs_label, ubs_date,
+amt_diff, receipt_url, receipt_name, receipt_items (jsonb), app_channel
 ('mike'|'test'), submission_status ('pending'|'to_submit'|'submitted'),
 submitted_at`
 
-**Table `app_profiles`**
-`user_id (→ auth.users), role ('user'|'finance'), app_channel
-('mike'|'test'|'all')`
+**Table `login_attempts`** — limitation des tentatives de connexion, créée à la
+demande.
 
-**Bucket storage `receipts`** — cloisonné par dossier = canal
-(`mike/<timestamp>_<rand>.jpg`). Les vieux reçus de Mike sont à la racine du
-bucket ; les policies les traitent via `coalesce(folder,'mike')`.
+**`receipt_items`** est la liste des justificatifs multiples,
+`[{path, name}]`. `receipt_url`/`receipt_name` restent renseignés avec le
+premier, pour compatibilité avec le code d'avant.
 
-**Migrations** — à appliquer manuellement, dans cet ordre :
-`supabase-add-app-channel.sql` → `supabase-add-submission-status.sql` →
-`supabase-auth-rls.sql`.
-⚠ `supabase-auth-rls.sql` contient encore les placeholders
-`MIKE_EMAIL_A_REMPLACER` / `FINANCE_EMAIL_A_REMPLACER`. **Le SQL réellement
-appliqué en production n'est donc pas dans le dépôt**, et rien dans le code ne
-permet de savoir ce qui est appliqué.
-
-Avant toute intervention touchant aux droits, lancer `tools/audit-rls.sql`
-dans le SQL Editor : en une requête il dit si RLS est actif sur `expenses` et
-`app_profiles`, si le bucket `receipts` est bien privé (l'app suppose que
-oui — elle crée des URLs signées), quelles policies existent réellement, et
-quels comptes ont une ligne dans `app_profiles`. `tools/probe-anon.sh` en
-donne la contrepartie empirique depuis une machine connectée.
+### Justificatifs : R2, jamais en direct
+Clés de la forme `<canal>/<timestamp>_<aléa>.<ext>`. **Le bucket n'est jamais
+exposé** : toute lecture passe par `GET /api/receipts`, qui renvoie une URL
+signée ou sert le fichier. Ne jamais réintroduire d'`<img src>` pointant
+directement sur R2.
 
 ### Auth
-`notesfrais-access.js` injecte un composant `AccessGate` qui enveloppe
-`<App/>`. Login email + mot de passe Supabase **obligatoire**
-(`NOTESFRAIS_REQUIRE_SUPABASE_AUTH = true`). Les anciens codes locaux
-(`MIKE2026` / `FINANCE2026`) sont désactivés mais le code mort est resté.
+Cookie `notesfrais_session`, signé HMAC-SHA256 avec `NOTESFRAIS_COOKIE_SECRET`,
+`HttpOnly` / `SameSite=Lax` / `Secure` en production, valable 14 jours.
+Vérification en temps constant.
 
-Après login, `AccessGate` lit `app_profiles` et publie deux globales que
-**tout le reste du code lit** :
+Deux façons de déclarer les comptes, par priorité :
+
+1. **`NOTESFRAIS_USERS`** — tableau JSON, autant de comptes qu'on veut, avec
+   `passwordHash` au format `scrypt$<sel>$<empreinte>` généré par
+   `node scripts/hash-password.mjs 'secret'`.
+2. Les quatre variables historiques `NOTESFRAIS_USER_*` / `NOTESFRAIS_FINANCE_*`,
+   mots de passe en clair. Ignorées si la première est définie.
+
+Après login, deux globales que **tout le front lit** :
 
 ```js
 window.notesFraisRole      // 'user' | 'finance' | null
 window.notesFraisProfile   // { role, app_channel }
 ```
 
-C'est le mécanisme central de bascule d'UI. `notesfrais-test-finance-settings.js`
-les assigne aussi en synchrone dans le rendu de `AccessGate` (sans quoi elles
-arrivent trop tard pour le `useState` initial de `tab`).
+### Les droits sont côté serveur, et seulement là
+Il n'y a **pas de RLS** : Neon n'en a pas de configurées ici. Toute
+l'autorisation vit dans les routes API. En conséquence, **chaque nouvelle route
+doit refaire les contrôles elle-même** :
 
-### Les deux rôles
-- **`user`** → onglets `Frais` (`expenses`), `Stats`, `UBS`. Saisit,
-  photographie, soumet son mois.
-- **`finance`** → onglets `Finance` (dashboard par mois), `Frais`
-  (`finance_expenses`, avec export ZIP des justificatifs), `Stats`, `UBS`,
-  `Paramètres` (mapping comptable). Voit tous les canaux.
-
-### Triple cloisonnement des canaux
-Défense en profondeur — modifier l'un sans les autres crée des fuites :
-1. **RLS** — un `user` ne lit que les lignes de `app_channel = son canal`.
-2. **Client** (`notesfrais-channel-isolation.js`) — filtre `belongsToNotesFraisChannel`
-   au retour de `fetchExpenses`, et écrit un marqueur base64 `[NF:meta:...]`
-   dans `note` (+ legacy `[NF:test]`) pour les lignes antérieures à la
-   colonne `app_channel`.
-3. **Storage** (`notesfrais-channel-storage.js`) — préfixe le canal dans le
-   chemin du fichier.
-
-### Justificatifs : chemins, pas URLs
-`notesfrais-storage-secure.js` a fait passer le bucket de public à privé.
-Depuis :
-- la colonne `receipt_url` stocke un **chemin storage**, pas une URL ;
-- côté JS l'expense expose `receiptPath` (et `receiptUrl` en alias) ;
-- l'affichage passe par `getReceiptUrl(path, download?, name?)` qui crée une
-  **URL signée valable 300 s**.
-
-**Ne jamais réintroduire de `<img src={e.receiptUrl}>` ou de `<a href>`
-direct** : ça ne marchera plus. Passer par `getReceiptUrl` ou `<Thumb path=…>`.
+- `user` ne lit, modifie et supprime que `app_channel = sa valeur` ; `finance`
+  voit tout.
+- `app_channel` d'un frais créé est **forcé depuis la session**, jamais lu dans
+  le corps de la requête.
+- Un mois `submitted` est clos : un `user` ne peut plus rien y changer.
+- L'accès à un justificatif est vérifié **deux fois** : préfixe de chemin, puis
+  requête en base confirmant qu'il appartient à une dépense du canal. Lecture et
+  suppression appliquent le même contrôle.
 
 ---
 
-## 5. Quelle fonctionnalité vit dans quel patch
+## 4. Quelle fonctionnalité vit dans quel patch
 
-Ordre de chargement de `mike.html` (le canal test est identique moins
-`mike-en`/`mike-final-en`, plus `test-user-expenses`) :
+Ordre de chargement de `mike.html`, 40 patches. Les 34 premiers viennent de
+l'époque Supabase et continuent de tourner grâce au shim.
 
 | # | Patch | Ce qu'il fait |
 |---|---|---|
-| 1 | `patches.js` | Base : vrai `StatsTab`, selects mois/nav en mobile, carte de marque « NUMERIQ PAYROLL », inputs 16px iOS. |
+| 1 | `patches.js` | Base : vrai `StatsTab`, selects mobiles, carte de marque, inputs 16px iOS. |
 | 2 | `submit-summary.js` | Modale « Résumé avant soumission ». |
-| 3 | `pwa.js` | Injecte manifest + enregistrement du SW selon le canal. |
-| 4 | `storage-secure.js` | Bucket privé, URLs signées, `receiptPath`. |
-| 5 | `channel-storage.js` | Préfixe canal dans les chemins storage. |
-| 6 | `ocr-boost.js` | OCR Tesseract.js (chargé à la volée du CDN) + prétraitement image (binarisation adaptative) + extraction montant/TVA/date/commerçant. |
-| 7 | `offline.js` | File d'attente IndexedDB (`notesfrais-offline-v1`), resync sur `online`. |
-| 8 | `offline-fixed.js` | Timeout de fetch 6,5 s → « mode local », marquage canal dans la file. |
-| 9 | `channel-isolation.js` | Marqueurs `[NF:meta:…]`, filtrage client, fallback si `app_channel` absent. |
-| 10 | `sync-status.js` | Réécrit en DOM la pastille « Supabase connecté » (n à synchroniser / hors ligne). |
-| 11 | `flow.js` | Brouillon auto du formulaire (localStorage, 7 j) + champ de recherche dans l'historique. |
-| 12 | `meal-context.js` | Champ « Avec qui ? » sur la catégorie repas → préfixé dans `note`. |
-| 13 | `current-month.js` | Mois par défaut = mois courant (fallback `2026-03`). |
-| 14 | `test-payment-card.js` | Champ obligatoire « Carte utilisée » (entreprise/perso) → écrit dans `note`, badge 💳 dans les listes. |
-| 15-16 | `test-annual-stats.js`, `-fix.js` | **`loadData` charge les 12 mois en parallèle** (indispensable au dashboard finance et aux stats annuelles) + `StatsTab` avec bascule année/mois. |
-| 17 | `test-history-annual.js` | Largement supplanté par `-fix.js`. Ne reste efficace que sur 3 remplacements ; les 5 autres sont des fallbacks inertes. |
-| 18 | `test-search-dedupe.js` | Déduplique le champ de recherche si deux inputs identiques deviennent adjacents. Le cas ne se produit plus depuis `period-inside-tabs.js` : le patch tourne mais ne fait rien. Filet de sécurité, à garder. |
-| 19 | `access.js` | `AccessGate` (login Supabase, rôles). |
-| 20 | `test-submission-badge.js` | Badge de statut de soumission + `submitCurrentMonth()` (UPDATE Supabase + appel `/api/notify-submission`). |
-| 21-24 | `test-finance-settings/-dashboard/-expenses/-receipts-zip.js` | Tout l'espace finance : mapping comptable, dashboard mensuel, tableau des frais, export ZIP (JSZip depuis le CDN). |
-| 25 | `delight.js` | Micro-interactions DOM. |
-| 26 | `mobile-cleanup.js` | Masque le bloc d'actions desktop en mobile. |
-| 27 | `test-sticky-nav.js` | Barre d'onglets fixe en bas + gros CTA « Scan receipt ». **Pur DOM, `setInterval` 150 ms**, pilote l'app en simulant des `change` sur le `<select>` de nav. |
-| 28 | `test-modal-fix.js` | Force la modale d'ajout en feuille plein écran sur iOS. |
-| 29 | `test-period-inside-tabs.js` | **Étend `MONTHS` aux 12 mois de 2026** + sélecteur de période Mois / Plage / Toute l'année dans chaque onglet. |
-| 30 | `test-compress.js` | Compresse la photo (max 1800 px, JPEG q .78) avant OCR et upload. |
-| 31 | `test-finance-submissions.js` | Vue finance des mois soumis. |
-| 32-33 | `mike-en.js`, `mike-final-en.js` | Traduction FR → EN de tout le HTML final, par `split()/join()` de paires. Tout libellé français ajouté par un patch **antérieur** doit avoir sa paire ici. |
-| 34 | `delete-confirm.js` | Boîte de confirmation avant suppression d'un frais. `deleteExpense` n'efface plus : il ouvre la modale, donc **tous les appelants sont couverts, présents et futurs**. Chargé **après** les traductions, il porte donc ses deux langues lui-même. |
-
-Le test suite refuse tout `notesfrais-*.js` présent sur le disque et chargé par
-aucune page — donc pas de fichier orphelin qui traîne.
+| 3 | `pwa.js` | Manifest + enregistrement du SW. |
+| 4-5 | `storage-secure.js`, `channel-storage.js` | Chemins de justificatifs, préfixe de canal. |
+| 6 | `ocr-boost.js` | OCR Tesseract.js + prétraitement image + extraction montant/TVA/date/commerçant. |
+| 7-8 | `offline.js`, `offline-fixed.js` | File IndexedDB (`notesfrais-offline-v1`), resync, timeout 6,5 s → mode local. |
+| 9 | `channel-isolation.js` | **Largement neutralisé** : `api-backend.js` réécrit le bloc où il s'injectait. Le cloisonnement est désormais serveur. |
+| 10 | `sync-status.js` | Pastille d'état de synchronisation, en DOM. |
+| 11 | `flow.js` | Brouillon auto du formulaire + recherche dans l'historique. |
+| 12 | `meal-context.js` | Champ « Avec qui ? » sur la catégorie repas. |
+| 13 | `current-month.js` | Mois par défaut = mois courant. |
+| 14 | `test-payment-card.js` | Champ obligatoire « Carte utilisée », badge 💳. |
+| 15-17 | `test-annual-stats*.js`, `test-history-annual.js` | Chargement des 12 mois, stats annuelles. |
+| 18 | `test-search-dedupe.js` | Filet contre un doublon de champ de recherche. Inerte aujourd'hui. |
+| 19 | `access.js` | `AccessGate` : écran de login, publication des globales de rôle. |
+| 20 | `test-submission-badge.js` | Badge de statut + `submitCurrentMonth()`. |
+| 21-24 | `test-finance-*.js` | Espace finance : paramètres comptables, dashboard, tableau des frais, export ZIP (JSZip). |
+| 25-26 | `delight.js`, `mobile-cleanup.js` | Micro-interactions, masquage du bloc desktop. |
+| 27-28 | `test-sticky-nav.js`, `test-modal-fix.js` | Nav fixe en bas + CTA scan ; modale plein écran iOS. **Pur DOM, `setInterval` 150 ms.** |
+| 29 | `test-period-inside-tabs.js` | 12 mois + sélecteur Mois / Plage / Année. |
+| 30-32 | `test-user-expenses.js`, `test-compress.js`, `test-finance-submissions.js` | Onglet Frais utilisateur, compression photo, vue des mois soumis. |
+| 33-34 | `mike-en.js`, `mike-final-en.js` | Traduction FR → EN par `split()/join()` de paires. |
+| 35 | **`api-backend.js`** | **Le shim** : remplace le client Supabase par un objet de même forme routant vers `/api/*`. |
+| 36 | `multi-receipts.js` | Plusieurs justificatifs par dépense (`receipt_items`). |
+| 37 | `english-ui.js` | 263 paires de traduction supplémentaires. |
+| 38 | `ios-ui.js` | Ajustements iOS. |
+| 39 | `user-edit.js` | **Édition d'un frais**, boutons Edit/Delete, état « Closed » sur un mois soumis. |
+| 40 | `delete-confirm.js` | Confirmation avant suppression. `deleteExpense` n'efface plus : il ouvre la modale, donc **tous les appelants sont couverts, présents et futurs**. Chargé après les traductions, il porte ses deux langues lui-même. |
 
 ---
 
-## 6. Ajouter ou modifier une fonctionnalité
+## 5. Ajouter ou modifier une fonctionnalité
 
 ### Créer un nouveau patch
 
-1. Copier le squelette de `notesfrais-test-compress.js`. Marqueur
-   d'idempotence **versionné** (`NOTESFRAIS_MA_FEATURE_V1`) — l'incrémenter à
-   chaque changement de forme du patch.
-2. Copier la chaîne cible **depuis le HTML réellement produit**, pas depuis
+1. Copier le squelette de `notesfrais-delete-confirm.js`. Marqueur d'idempotence
+   **versionné** (`NOTESFRAIS_MA_FEATURE_V1`), à incrémenter à chaque changement
+   de forme.
+2. Copier la chaîne cible **depuis le HTML réellement produit**, jamais depuis
    `app.html`, dès qu'un patch antérieur y a touché :
    ```bash
-   node tools/check-patches.js test
-   grep -o 'ma chaîne cible.\{0,120\}' .patch-out/out-test.html
+   node tools/check-patches.js mike
+   grep -o 'ma chaîne cible.\{0,120\}' .patch-out/out-mike.html
    ```
-3. L'ajouter à `test.html` (tableau `patchFiles`), à la **bonne position**
-   dans l'ordre.
-4. L'ajouter à `SHELL_FILES` dans `test-sw.js` **et bumper `CACHE_NAME`**
-   (`notesfrais-test-shell-v30` → `v31`).
-5. `node tools/test-patches.js` doit rester vert, et `node tools/check-patches.js
-   test` ne doit pas montrer de nouveau no-op sur ton fichier. Vérifier au grep
-   dans `.patch-out/out-test.html` que la modification est bien présente. Si le
-   patch ajoute une fonctionnalité durable, lui ajouter un marqueur dans
-   `REQUIRED` de `tools/test-patches.js`.
-6. Tester sur `/test`, puis promouvoir : mêmes gestes sur `mike.html` +
-   `mike-sw.js` (bumper `notesfrais-mike-shell-vN`).
+3. L'ajouter à `mike.html` à la **bonne position**, puis répercuter sur
+   `index.html` et `iphone-fix.html` (`cp mike.html index.html`).
+4. L'ajouter à `SHELL_FILES` dans `mike-sw.js` **et bumper `CACHE_NAME`**.
+5. `node tools/test-patches.js` doit rester vert. Si le patch ajoute une
+   fonctionnalité durable, lui ajouter un marqueur dans `REQUIRED`.
 
-### Les 4 pièges qui coûtent le plus cher
+### Les cinq pièges qui coûtent le plus cher
 
-1. **Oublier le SW.** HTML, SW et cache doivent bouger ensemble. Le fichier
-   ajouté à `mike.html` mais absent de `mike-sw.js` fait échouer le
-   `fetch()` hors ligne → l'app entière affiche « Unable to load NotesFrais ».
+1. **Oublier le SW.** HTML, SW et cache doivent bouger ensemble. Un fichier
+   ajouté à `mike.html` mais absent de `mike-sw.js` fait échouer le `fetch()`
+   hors ligne → l'app entière affiche « Unable to load NotesFrais ».
 2. **Ne pas bumper `CACHE_NAME`.** Les PWA installées continuent de servir
-   l'ancien shell. Les SW sont en network-first, donc en ligne ça passe — le
-   bug ne se voit qu'en offline ou au premier chargement. Bumper systématiquement.
-3. **Ajouter du français sans sa traduction.** Tout libellé FR introduit par
-   un patch doit avoir sa paire dans `mike-final-en.js` (**pas**
-   `mike-en.js`, qui est mal encodé, cf. §8).
-4. **Renommer un libellé visible.** `sticky-nav.js`, `delight.js`,
-   `mobile-cleanup.js`, `sync-status.js`, `modal-fix.js` et le script du logo
-   trouvent leurs éléments par `textContent`. Changer « + Ajouter un frais »
-   casse la barre de nav mobile.
-
-5. **Sur `/mike`, la traduction renomme aussi les identifiants JS.**
-   `mike-en.js` et `mike-final-en.js` appliquent leurs paires par
-   `split()/join()` sur **tout le document**, y compris le code. Les paires
-   `['frais','expenses']` et `['Frais','Expenses']` transforment donc
-   `window.notesFraisRole` en `window.notesExpensesRole`,
-   `belongsToNotesFraisChannel` en `belongsToNotesExpensesChannel`, la clé
-   `notesfrais_access` en `notesexpenses_access`… **Ça ne marche que parce que
-   la substitution est appliquée en dernier, uniformément, à tout le HTML final.**
-   Conséquences :
+   l'ancien shell. Le SW est network-first, donc en ligne ça passe — le bug ne
+   se voit qu'en offline ou au premier chargement.
+3. **Ajouter du français sans sa traduction.** Trois patches de traduction se
+   superposent (`mike-en`, `mike-final-en`, `english-ui`, ~510 paires). Ajouter
+   les paires dans `mike-final-en.js` ou `english-ui.js` — **pas** `mike-en.js`,
+   mal encodé (§7).
+4. **Renommer un libellé visible.** `sticky-nav`, `delight`, `mobile-cleanup`,
+   `sync-status`, `modal-fix` et le script du logo trouvent leurs éléments par
+   `textContent`.
+5. **La traduction renomme aussi les identifiants JS.** Les paires
+   `['frais','expenses']` et `['Frais','Expenses']` s'appliquent par
+   `split()/join()` sur **tout le document, code compris** :
+   `window.notesFraisRole` devient `window.notesExpensesRole`. Ça ne marche que
+   parce que la substitution est uniforme et appliquée en dernier. Donc :
    - ne jamais lire `window.notesFraisRole` depuis un script **externe** au
-     document généré : sur `/mike` la globale ne porte pas ce nom ;
-   - les constantes en MAJUSCULES (`NOTESFRAIS_*`) ne sont pas touchées — s'en
-     servir pour tout ce qui doit rester stable entre canaux.
+     document généré ;
+   - les constantes en MAJUSCULES (`NOTESFRAIS_*`) sont épargnées — s'en servir
+     pour tout ce qui doit rester stable.
 
-   Deux emplacements possibles pour un nouveau patch, à choisir consciemment :
-   **avant** les traductions, et il faut alors ajouter ses paires dans
-   `mike-final-en.js` ; ou **après**, et le patch porte lui-même ses deux
-   langues via `window.NOTESFRAIS_CHANNEL==='mike'` (c'est ce que font
-   `meal-context.js` et `delete-confirm.js`). La seconde voie est plus sûre
-   pour tout texte neuf. En contrepartie, un patch placé après les traductions
-   doit cibler du code **déjà traduit** : viser des identifiants sans le mot
+   **Deux emplacements possibles pour un nouveau patch**, à choisir sciemment :
+   avant les traductions, et il faut alors ajouter ses paires ; ou après, et le
+   patch porte lui-même ses deux langues via
+   `window.NOTESFRAIS_CHANNEL==='mike'` (c'est ce que font `meal-context.js` et
+   `delete-confirm.js`). La seconde voie est plus sûre pour tout texte neuf, mais
+   impose de cibler du code **déjà traduit** : viser des identifiants sans le mot
    « frais », ou passer par une expression régulière.
 
+### Toucher aux routes API
+
+Il n'y a pas de RLS pour rattraper une erreur. Toute nouvelle route part de
+`requireSession(req)` et refait les contrôles de §3. Relire `api/expenses.js`
+comme modèle : liste blanche des champs modifiables, canal forcé depuis la
+session, vérification que les ids demandés sont bien accessibles avant d'écrire.
+
 ---
 
-## 7. Détails de fonctionnement utiles
+## 6. Détails de fonctionnement utiles
 
-- **Chargement des données.** Depuis `test-annual-stats.js`, `loadData`
-  déclenche **12 requêtes Supabase en parallèle** (une par mois de `MONTHS`)
-  et concatène. `expenses` contient donc toute l'année ; `mE` est la
-  projection sur la période choisie.
+- **Chargement des données.** `loadData` interroge les 12 mois en parallèle et
+  concatène. `expenses` contient toute l'année ; `mE` est la projection sur la
+  période choisie. Douze requêtes au démarrage — candidat à optimisation.
 - **Filtre de période.** `periodMode` (`'month'|'range'|'year'`) +
-  `periodFrom`/`periodTo` calculent `periodStart`/`periodEnd`, et `mE` filtre
-  par comparaison de chaînes ISO. La soumission n'est possible qu'en mode
-  `'month'`.
+  `periodFrom`/`periodTo` calculent `periodStart`/`periodEnd`. La soumission
+  n'est possible qu'en mode `'month'`.
 - **Réconciliation UBS.** `parseUBS` lit le CSV e-banking (`;`, dates
   `JJ.MM.AAAA`, apostrophes de milliers). `reconcile()` apparie sur montant
-  (tolérance) + proximité de date + score de similarité de libellé
-  (`labelScore`). Sortie : expenses `reconciled` avec `ubsRow`/`amtDiff`, et
-  `forgotten` = lignes UBS sans frais correspondant, créables en un clic.
-- **Soumission.** `submitCurrentMonth()` fait un `UPDATE` en masse
-  (`submission_status='submitted'`, `submitted_at`) sur les ids du mois, puis
-  `POST /api/notify-submission`. L'échec du mail ne fait pas échouer la
-  soumission (notification d'avertissement).
-- **Env vars Vercel** : `RESEND_API_KEY`, `SUBMISSION_MAIL_FROM`,
-  `FINANCE_NOTIFICATION_EMAIL` (défaut `numeriqpayroll1@gmail.com`). Sans
-  clé Resend, l'API répond `{ok:true, skipped:true}` et l'app affiche
-  « email non envoyé ».
-- **Offline.** IndexedDB `notesfrais-offline-v1`, store `expenses`, un champ
-  `channel` par entrée. Le fichier est sérialisé en data-URL base64.
-  Resync sur l'événement `online` et au montage.
-- **CDN externes**, tous chargés à l'exécution : React 17, ReactDOM 17,
-  Babel Standalone 7.23, supabase-js 2, Google Fonts (DM Sans / DM Mono),
-  Tesseract.js 4 (à la première photo), JSZip 3.10 (au premier export ZIP).
+  (tolérance) + proximité de date + score de similarité de libellé. Sortie :
+  frais `reconciled`, et `forgotten` = lignes UBS sans frais correspondant.
+- **Soumission.** `POST /api/monthly-submission` avec `{month}` : passe le mois
+  en `submitted`, **construit un ZIP des justificatifs et l'attache à l'email**
+  envoyé à la finance. Timeout client de 90 s, avec étapes affichées.
+- **Copie des reçus par email.** À chaque frais créé avec justificatif, un email
+  part vers `RECEIPT_BACKUP_EMAIL` (défaut : l'email de la session).
+- **Offline.** IndexedDB `notesfrais-offline-v1`, fichier sérialisé en data-URL
+  base64. Resync sur l'événement `online` et au montage.
+- **CDN externes**, chargés à l'exécution : React 17, ReactDOM 17, Babel
+  Standalone 7.23, Google Fonts, Tesseract.js 4 (première photo), JSZip 3.10
+  (premier export).
+
+### Variables d'environnement
+
+`DATABASE_URL` · `NOTESFRAIS_COOKIE_SECRET` (≥ 24 caractères) ·
+`NOTESFRAIS_USERS` **ou** `NOTESFRAIS_USER_EMAIL/PASSWORD` +
+`NOTESFRAIS_FINANCE_EMAIL/PASSWORD` · `R2_ACCOUNT_ID` · `R2_ACCESS_KEY_ID` ·
+`R2_SECRET_ACCESS_KEY` · `R2_BUCKET` · `RESEND_API_KEY` ·
+`FINANCE_NOTIFICATION_EMAIL` · `RECEIPT_BACKUP_EMAIL` · `RECEIPT_MAIL_FROM` ·
+`SUBMISSION_MAIL_FROM`. Modèle complet dans `.env.example`.
 
 ---
 
-## 8. Bugs connus et dette (vérifiés, pas supposés)
+## 7. Dette connue (vérifiée, pas supposée)
 
-État constaté avec `tools/check-patches.js` sur le HEAD actuel.
-
-### A. Double encodage UTF-8 — la cause racine
+### A. Double encodage UTF-8
 Plusieurs fichiers ont été sauvés une fois de trop en UTF-8 : `é` y est écrit
-`Ã©` (octets `C3 83 C2 A9`) au lieu de `C3 A9`. `app.html` est correct, donc
-**toute chaîne cible accentuée dans ces fichiers ne matche rien**.
+`Ã©` (`C3 83 C2 A9`) au lieu de `C3 A9`. `app.html` étant correct, **toute chaîne
+cible accentuée dans ces fichiers ne matche rien**.
 
-Fichiers touchés : `notesfrais-mike-en.js` (le plus grave),
-`notesfrais-flow.js`, `notesfrais-meal-context.js`,
-`notesfrais-test-payment-card.js`, `notesfrais-test-search-dedupe.js`, et le
-`<title>` d'`app.html`.
+Touchés, mesuré sur le HEAD actuel : `notesfrais-mike-en.js` (46 séquences,
+le plus grave), `notesfrais-flow.js` (5), `notesfrais-english-ui.js` (2),
+`notesfrais-test-payment-card.js` (1), `app.html` (1, dans le `<title>`).
 
-Détection :
 ```bash
-grep -l 'Ã©\|Ã¨\|Ã \|â€' *.js *.html
+grep -c 'Ã©\|Ã¨\|Ã \|â€' *.js *.html | grep -v ':0'
 ```
 
-Conséquences réelles :
+Conséquences mesurées :
 
-1. **UI anglaise incomplète sur `/mike`.** 33 des 124 paires de
-   `notesfrais-mike-en.js` échouent. ~14 chaînes françaises restent visibles
-   pour Mike : « Relevé UBS » (7 occurrences), « Paramètres » (5),
-   « Importer relevé UBS », « Réconciliation automatique », « Résumé avant
-   soumission », « Détail par catégorie », « Aucun relevé UBS importé »,
-   « Le commerçant est obligatoire », « stocké dans Supabase », « OCR en
-   cours », « Créer », « à régulariser », « Optionnel », « Soumettre ».
-   `notesfrais-mike-final-en.js` (correctement encodé) rattrape le reste —
-   **c'est là qu'il faut ajouter les paires manquantes.**
+- **14 des 125 paires de `mike-en.js` n'aboutissent pas.** C'était 33 avant la
+  migration : `english-ui.js` en rattrape la majorité. Deux libellés français
+  restent visibles dans l'UI anglaise — « Résumé avant soumission » et « Détail
+  par catégorie » (échantillon non exhaustif).
+- **Le toast « Scanner un autre » est inatteignable** : l'état et le JSX existent,
+  `setQuickAdd(true)` apparaît **0 fois** dans le HTML final.
+- **La croix de la modale d'ajout efface le brouillon** au lieu de le garder ;
+  seul « Garder en brouillon » préserve la saisie.
 
-2. **Le toast « Scanner un autre » est du code mort.** Dans
-   `notesfrais-flow.js`, les deux `replace()` censés ajouter
-   `setQuickAdd(true)` visent des chaînes mojibakées. Résultat dans le HTML
-   final : l'état `quickAdd` et le JSX du toast existent, `setQuickAdd(true)`
-   apparaît **0 fois**. Le toast ne peut jamais s'afficher, sur aucun canal.
-
-3. **Le bouton « × » de la modale d'ajout efface le brouillon** au lieu de le
-   garder, pour la même raison (le `replace()` correctif ne matche pas ;
-   seul « Garder en brouillon » préserve la saisie).
-
-### B. Tout est câblé en dur sur l'année 2026
-`MONTHS` est une liste littérale des 12 mois de 2026, `StatsTab` affiche
-« Annee 2026 », `getDefaultNotesFraisMonth()` retombe sur `2026-03` si le mois
-courant n'est pas dans `MONTHS`. **Au 1er janvier 2027 l'app se bloque sur
-mars 2026 et ne charge plus aucune donnée récente.** À rendre glissant
-(générer `MONTHS` depuis la date courante).
-Sur le canal racine `/`, où `test-period-inside-tabs.js` n'est pas chargé,
-`MONTHS` s'arrête à juin 2026 — **le problème est déjà actif là-bas.**
+### B. Tout est câblé sur 2026
+`MONTHS` est une liste littérale des douze mois de 2026, `StatsTab` affiche
+« Annee 2026 », `getDefaultNotesFraisMonth()` retombe sur `2026-03`. **Au
+1er janvier 2027 l'app se fige sur mars 2026.** À rendre glissant.
 
 ### C. Boucles `setInterval` permanentes
-`sticky-nav` (150 ms), `modal-fix` (150 ms), `history-annual` (500 ms),
-`sync-status` (4 s) tournent en continu, plus `mobile-cleanup` (300 ms) et
-l'injection du logo (250 ms) pendant les premières secondes. Chaque tick fait
-des `querySelectorAll` sur tout le document. Coûteux en batterie sur mobile,
-et source de scintillements. À migrer vers de vrais composants React dans les
-patches quand on y touche.
+`sticky-nav` et `modal-fix` toutes les 150 ms, `history-annual` 500 ms,
+`sync-status` 4 s. Chaque tick fait des `querySelectorAll` sur tout le document.
+Coûteux en batterie, source de scintillements.
 
-### D. Divers
+### D. Auth encore provisoire
+Comptes déclarés en variables d'environnement. Pas de révocation : un cookie
+signé reste valable 14 jours même après changement de mot de passe. Pas de trace
+de qui fait quoi. Une vraie table utilisateurs reste à faire.
+
+### E. Divers
+- Le canal `test` n'a plus de page d'entrée, mais le schéma et les routes le
+  supportent toujours (`app_channel = 'test'`). **Il n'y a donc plus de palier de
+  préproduction** : tout déploiement va directement chez Mike.
+- `app.html` garde 2 occurrences mortes de la clé Supabase.
+- `/api/notify-submission` coexiste avec `/api/monthly-submission` ; vérifier
+  lequel fait foi avant d'y toucher.
 - `mobile-cleanup.js` ne matche que le libellé français `+ Ajouter un frais` :
-  sur `/mike` (anglais) le bloc d'actions desktop n'est donc pas masqué en
-  mobile.
-- `index.html` et `iphone-fix.html` sont deux copies identiques. `vercel.json`
-  sert `iphone-fix.html` sur `/` ; `index.html` ne sert que de repli au
-  comportement par défaut de l'hébergeur. Toute modif doit aller dans les deux.
-- `supabase-auth-rls.sql` n'est pas exécutable en l'état (emails placeholder).
-
-### E. Déjà nettoyé (ne pas réintroduire)
-- Codes d'accès en dur `MIKE2026` / `FINANCE2026` et tout le chemin de login
-  « code local » : supprimés de `notesfrais-access.js`. L'auth Supabase est la
-  seule voie ; `tools/test-patches.js` échoue si ces chaînes reviennent.
-- `notesfrais-test-submission-status.js` et `-v2.js` : orphelins supprimés.
-- La modale `submitModal` dupliquée dans `notesfrais-patches.js` : sa cible ne
-  matchait pas (espace finale parasite) et `notesfrais-submit-summary.js` fait
-  le travail. Supprimée.
+  sur l'UI anglaise le bloc desktop n'est pas masqué en mobile.
+- Douze requêtes Neon au démarrage, une par mois.
 
 ---
 
-## 9. Git et déploiement
+## 8. Git et déploiement
 
-- Déploiement Vercel sur push `main`. Pas de CI, pas de tests.
+- Déploiement Vercel sur push `main`. Pas de CI.
 - Développer sur une branche, ouvrir une PR — **ne jamais pousser sur `main`
   sans demande explicite.**
-- Après déploiement, forcer le rechargement du SW sur mobile (fermer la PWA,
-  la rouvrir) sinon on teste l'ancien shell.
-- Style de commit du repo : une ligne, impératif anglais
-  (`Fix finance submitted month view on test`).
+- Après déploiement, fermer et rouvrir la PWA sur mobile, sinon on teste
+  l'ancien shell.
+- Style de commit : une ligne, impératif anglais.
