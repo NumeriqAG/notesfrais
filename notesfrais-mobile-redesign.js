@@ -608,7 +608,12 @@
       '             </div>}',
       // Le justificatif est la seule copie : l'echec d'OCR ne doit pas laisser
       // croire que la photo est perdue.
-      '          {ocrStatus===\'error\'&&<div className="nfm-note nfm-note-amber">{\'The photo is kept. Only the reading failed \\u2014 type the fields below and it is done.\'}</div>}',
+      '          {ocrStatus===\'error\'&&<div className="nfm-note nfm-note-amber">',
+      '            <div>{\'The photo is kept. Only the reading failed \\u2014 type the fields below and it is done.\'}</div>',
+      // La cause exacte, en petit : sans elle, la meme panne se represente et
+      // personne ne sait pourquoi. Sur iPhone, la console n'est pas lisible.
+      '            {ocrReason&&<div style={{marginTop:6,fontSize:11.5,opacity:.75,wordBreak:\'break-word\'}}>{ocrReason}</div>}',
+      '          </div>}',
       '          <div className="nfm-group">',
       '            <h4>AMOUNT</h4>',
       '            <div className="nfm-rows">',

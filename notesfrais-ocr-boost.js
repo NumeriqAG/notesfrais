@@ -84,29 +84,47 @@
   }
   const runOCR=async(imgFile)=>{
     if(!imgFile.type.startsWith('image/'))return;
-    setOcrStatus('scanning');setOcrProgress(0);
+    setOcrStatus('scanning');setOcrProgress(0);setOcrReason('');
     try{
       if(!window.Tesseract){
         await new Promise((resolve,reject)=>{
           const s=document.createElement('script');
           s.src='https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
-          s.onload=resolve;s.onerror=reject;
+          s.onload=resolve;
+          s.onerror=()=>reject(new Error('Tesseract could not be loaded from the CDN'));
           document.head.appendChild(s);
         });
       }
       const prepared=await preprocessReceiptImage(imgFile);
-      const result=await window.Tesseract.recognize(prepared,'fra+eng',{
+      // Tesseract telecharge son worker, son WASM et deux jeux de donnees de
+      // langue. Sans borne, une de ces requetes qui n'aboutit jamais laisse la
+      // barre a 0% indefiniment, sans message.
+      let timer;
+      const deadline=new Promise((_,reject)=>{
+        timer=setTimeout(()=>reject(new Error('Timeout: reading took longer than 90 seconds')),90000);
+      });
+      const result=await Promise.race([deadline,window.Tesseract.recognize(prepared,'fra+eng',{
         logger:m=>{if(m.status==='recognizing text')setOcrProgress(Math.round(m.progress*100));},
         tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÂÄÇÉÈÊËÎÏÔÖÙÛÜàâäçéèêëîïôöùûü0123456789.,:/- CHFchfTOTALtotalTVAtvaMWSTmwst '
-      });
+      })]).finally(()=>clearTimeout(timer));
       const fields=extractReceiptFields(result.data.text||'');
       setForm(f=>({...f,merchant:fields.merchant||f.merchant,amount:fields.total?fields.total.toFixed(2):f.amount,tva:fields.tva?fields.tva.toFixed(2):f.tva,date:fields.date||f.date}));
       setOcrStatus('done');
-    }catch(e){console.error('OCR error:',e);setOcrStatus('error');}
+    }catch(e){
+      console.error('OCR error:',e);
+      const name=(e&&e.name)||'Error';
+      const message=String((e&&e.message)||e||'').slice(0,160);
+      setOcrReason(name==='Error'?message:(name+': '+message));
+      setOcrStatus('error');
+    }
   };
 `;
 
     html = html.replace(/  const runOCR=async\(imgFile\)=>\{[\s\S]*?\n  \};\n\n  const handleFile=f=>\{/, boosted + '\n\n  const handleFile=f=>{');
+    html = html.replace(
+      'const [ocrStatus,setOcrStatus]=useState(null);',
+      'const [ocrStatus,setOcrStatus]=useState(null);const [ocrReason,setOcrReason]=useState(\'\');'
+    );
     return html;
   };
 })();

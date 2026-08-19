@@ -91,6 +91,10 @@ const page = await browser.newPage({
 const errors = [];
 page.on('pageerror', e => errors.push(String(e).split('\n')[0].slice(0, 200)));
 
+// Tesseract n'est de toute facon pas joignable ici : on coupe net pour que la
+// branche d'echec s'exerce tout de suite au lieu d'attendre le timeout de 90 s.
+await page.route('**/tesseract*', route => route.abort());
+
 await page.route('**/api/**', async route => {
   const req = route.request();
   const url = new URL(req.url());
@@ -186,10 +190,12 @@ check('le nom du fichier est visible',
   (await page.locator('.nfm-shot-name').innerText()).includes('recu-coop'));
 const ocrLabel = await page.locator('.nfm-ocr-l').innerText();
 check('l etat de lecture est annonce', ocrLabel.length > 0, ocrLabel);
-if (/Could not read|failed/i.test(ocrLabel) || await page.locator('.nfm-note-amber').count()) {
-  check('l echec d OCR rassure sur la photo',
-    (await page.locator('.nfm-note-amber').innerText()).includes('photo is kept'));
-}
+check('l echec d OCR est annonce', /Could not read/i.test(ocrLabel), ocrLabel);
+const amber = await page.locator('.nfm-note-amber').innerText();
+check('il rassure sur la photo', amber.includes('photo is kept'));
+// Sans la cause, la meme panne se represente et personne ne sait pourquoi.
+check('il donne la cause', /CDN|Timeout|Error|SecurityError/i.test(amber),
+  amber.replace(/\s+/g, ' ').slice(0, 140));
 await shot('01-capture');
 
 // ── 3 · Enregistrer ───────────────────────────────────────────────────
