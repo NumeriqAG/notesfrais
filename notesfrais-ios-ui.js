@@ -108,7 +108,9 @@
 
     const script = `<script id="notesfrais-ios-ui-script-v1">(function(){
 function text(el){return (el&&el.textContent||'').replace(/\\s+/g,' ').trim();}
-function isMikeUser(){return window.NOTESFRAIS_CHANNEL==='mike'&&window.notesFraisRole!=='finance';}
+// Les deux canaux utilisateur portent la meme interface : sans ca, /test ne rend
+// pas la couche iOS et ne valide plus ce qu'on livre sur /mike.
+function isMikeUser(){return (window.NOTESFRAIS_CHANNEL==='mike'||window.NOTESFRAIS_CHANNEL==='test')&&window.notesFraisRole!=='finance';}
 function isMobile(){return window.innerWidth<860;}
 function addHeader(content){
   if(document.getElementById('nf-ios-header'))return;
