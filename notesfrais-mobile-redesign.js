@@ -56,7 +56,7 @@
     // fermeture complete. A bumper a chaque livraison.
     must(
       "const fmt=n=>Number(n||0).toFixed(2);",
-      "const NOTESFRAIS_BUILD='2026-08-19-f';\nconst fmt=n=>Number(n||0).toFixed(2);"
+      "const NOTESFRAIS_BUILD='2026-08-19-g';\nconst fmt=n=>Number(n||0).toFixed(2);"
     );
 
     const style = `<style id="notesfrais-mobile-redesign-v1">
@@ -829,7 +829,9 @@
     // mike-en.js : ses chaines ne passent pas par les paires de traduction et
     // sont donc ecrites ici dans les deux langues. Les ancres aussi : /test
     // rend cette boite en francais.
-    const EN = window.NOTESFRAIS_CHANNEL === 'mike';
+    // Les deux canaux utilisateur portent la meme interface anglaise : gater la
+    // langue sur le canal faisait rendre /test en francais dans une UI anglaise.
+    const EN = true;
     const del = {
       title:   EN ? 'Delete this expense?' : 'Supprimer ce frais ?',
       warn:    EN ? 'The receipt goes with it, and the paper ticket is probably gone. NotesFrais holds the only copy.'
@@ -855,6 +857,19 @@
       "              <button onClick={()=>performDeleteExpense(pendingDelete.id,pendingDelete.receiptPath)} disabled={deletingExpense} style={{...bP,justifyContent:'center',padding:'12px 16px',fontSize:14,background:'var(--red)',opacity:deletingExpense?0.6:1}}>{deletingExpense?'" + del.busy + "':'" + del.confirm + "'}</button>",
       "              <button className=\"nfm-del-go\" onClick={()=>performDeleteExpense(pendingDelete.id,pendingDelete.receiptPath)} disabled={deletingExpense} style={{...bP,justifyContent:'center',padding:'12px 16px',fontSize:14,background:'var(--red)',opacity:deletingExpense?0.6:1}}>{deletingExpense?'" + del.busy + "':(isMobile?'" + del.go + "':'" + del.confirm + "')}</button>"
     );
+
+    // ───────────────────────────────────────────────────────────────
+    // 5 bis · Les derniers libelles francais de l'UI anglaise
+    // ───────────────────────────────────────────────────────────────
+    // Ce patch est charge apres les trois passes de traduction : ce qui reste
+    // ici a echappe a leurs paires. Charge en dernier, il voit le texte final.
+    [
+      ['\u2713 Importer {parsed.rows.length} lignes', '\u2713 Import {parsed.rows.length} rows'],
+      ["'Sans libell\u00e9'", "'No label'"],
+      ['>\u00c9cart {fmt(e.amtDiff)}<', '>Difference {fmt(e.amtDiff)}<'],
+      ["'Aucune transaction d\u00e9tect\u00e9e.'", "'No transaction found in this file.'"],
+      ['Aucun mois avec expenses.', 'No month with expenses.']
+    ].forEach(function(pair){ must(pair[0], pair[1]); });
 
     // ───────────────────────────────────────────────────────────────
     // 6 · Le grand titre se compacte — la seule chose que le CSS ne sait pas

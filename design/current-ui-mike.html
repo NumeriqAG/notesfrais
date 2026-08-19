@@ -1310,7 +1310,7 @@ function getDefaultNotesFraisMonth(){
   return MONTHS.some(m=>m.v===current)?current:'2026-03';
 }
 const NOTESFRAIS_LOCALE_V1='en-GB';
-const NOTESFRAIS_BUILD='2026-08-19-f';
+const NOTESFRAIS_BUILD='2026-08-19-g';
 const fmt=n=>Number(n||0).toFixed(2);
 const fd=d=>{
   const raw=String(d||'').trim();
@@ -1569,7 +1569,7 @@ function AddModal({onClose,onAdd,month}){
       new Worker(url).terminate();
       return 'blob worker OK';
     }catch(err){
-      return 'blob worker BLOQUE ('+((err&&err.name)||'Error')+')';
+      return 'blob worker BLOCKED ('+((err&&err.name)||'Error')+')';
     }finally{
       if(url)URL.revokeObjectURL(url);
     }
@@ -1577,8 +1577,8 @@ function AddModal({onClose,onAdd,month}){
   // « undefined » remonte tel quel dans un catch : sans description robuste,
   // le bandeau affichait une cause vide, ce qui n'apprend rien.
   function describeError(e){
-    if(e===undefined)return 'rejet undefined';
-    if(e===null)return 'rejet null';
+    if(e===undefined)return 'rejected with undefined';
+    if(e===null)return 'rejected with null';
     if(typeof e==='string')return e.slice(0,170);
     const bits=[];
     if(e.name)bits.push(e.name);
@@ -1590,20 +1590,46 @@ function AddModal({onClose,onAdd,month}){
     }
     return bits.join(': ').slice(0,170);
   }
+  // La sonde precedente creait un worker blob: vide et le declarait OK. Mais
+  // Tesseract, lui, y execute un importScripts vers jsdelivr : c'est CE geste
+  // qu'il faut reproduire. Un echec la-dedans tue le worker avant qu'il emette
+  // le moindre statut — exactement ce que l'appareil rapporte.
+  function probeWorkerImport(){
+    return new Promise(resolve=>{
+      let url=null,worker=null,timer=null;
+      const done=verdict=>{
+        if(timer)clearTimeout(timer);
+        try{if(worker)worker.terminate();}catch(_){}
+        if(url)URL.revokeObjectURL(url);
+        resolve(verdict);
+      };
+      try{
+        const body="try{importScripts('https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/worker.min.js');"
+          +"postMessage('OK');}catch(e){postMessage('KO '+((e&&e.message)||e||'no message'));}";
+        url=URL.createObjectURL(new Blob([body],{type:'text/javascript'}));
+        worker=new Worker(url);
+        timer=setTimeout(()=>done('importScripts NO REPLY after 8s'),8000);
+        worker.onmessage=event=>done('importScripts '+event.data);
+        worker.onerror=event=>done('importScripts KILLED THE WORKER: '+((event&&event.message)||'no message'));
+      }catch(err){
+        done('worker creation refused: '+((err&&err.name)||'Error'));
+      }
+    });
+  }
   const runOCR=async(imgFile)=>{
     if(!imgFile.type.startsWith('image/'))return;
     setOcrStatus('scanning');setOcrProgress(0);setOcrReason('');
     // L'etape est la seule chose qui situe la panne quand l'erreur est vide.
-    let stage='depart';
+    let stage='start';
     let preparedKo=0;
     // Tesseract annonce ou il en est : « loading tesseract core »,
     // « initializing tesseract », « loading language traineddata »,
     // « initializing api », « recognizing text ». Quand il rejette avec
     // undefined, ce dernier statut est la seule chose qui situe la panne.
-    let lastStatus='(none statut)';
+    let lastStatus='(none yet)';
     let workerError='';
     try{
-      stage='chargement Tesseract';
+      stage='loading Tesseract';
       if(!window.Tesseract){
         await new Promise((resolve,reject)=>{
           const s=document.createElement('script');
@@ -1613,10 +1639,10 @@ function AddModal({onClose,onAdd,month}){
           document.head.appendChild(s);
         });
       }
-      stage='pretraitement image';
+      stage='preprocessing image';
       const prepared=await preprocessReceiptImage(imgFile);
       preparedKo=Math.round((prepared&&prepared.size||0)/1024);
-      stage='lecture ('+preparedKo+' Ko)';
+      stage='reading ('+preparedKo+' KB)';
       // Tesseract telecharge son worker, son WASM et deux jeux de donnees de
       // langue. Sans borne, une de ces requetes qui n'aboutit jamais laisse la
       // barre a 0% indefiniment, sans message.
@@ -1642,10 +1668,10 @@ function AddModal({onClose,onAdd,month}){
       }catch(first){
         // 'fra+eng' telecharge deux jeux de donnees ; si l'un des deux
         // n'arrive pas, une lecture en anglais seul vaut mieux que rien.
-        stage='lecture eng seul apres echec fra+eng ['+lastStatus+' \u2192 '+describeError(first)+']';
+        stage='eng-only retry after fra+eng failed ['+lastStatus+' \u2192 '+describeError(first)+']';
         result=await read('eng');
       }
-      stage='extraction des champs';
+      stage='extracting fields';
       const fields=extractReceiptFields(result.data.text||'');
       setForm(f=>({...f,merchant:fields.merchant||f.merchant,amount:fields.total?fields.total.toFixed(2):f.amount,tva:fields.tva?fields.tva.toFixed(2):f.tva,date:fields.date||f.date}));
       setOcrStatus('done');
@@ -1654,14 +1680,16 @@ function AddModal({onClose,onAdd,month}){
       const build=typeof NOTESFRAIS_BUILD==='string'?NOTESFRAIS_BUILD:'?';
       const detail=[
         stage+' \u2192 '+describeError(e),
-        'dernier statut: '+lastStatus,
+        'last status: '+lastStatus,
         workerError?('worker: '+workerError):'',
-        'image '+preparedKo+' Ko',
+        'image '+preparedKo+' KB',
         probeBlobWorker(),
+        window.Tesseract&&window.Tesseract.version?('tesseract '+window.Tesseract.version):'',
         'build '+build
       ].filter(Boolean).join(' \u00b7 ');
       setOcrReason(detail);
       setOcrStatus('error');
+      probeWorkerImport().then(verdict=>setOcrReason(detail+' \u00b7 '+verdict));
     }
   };
 
@@ -1684,7 +1712,7 @@ function AddModal({onClose,onAdd,month}){
 
   const nfmReset=()=>{setFile(null);setPreview(null);setOcrStatus(null);setOcrProgress(0);setErr('');setForm(prev=>({merchant:'',amount:'',tva:'',date:prev.date,category:prev.category,mealWith:'',note:'',paymentCard:prev.paymentCard||''}));const b=document.querySelector('.nfm-sheet-body');if(b)b.scrollTop=0;};
   const confirm=async(nfmAgain)=>{
-    if(form.category==='repas'&&!String(form.mealWith||'').trim()){setErr(window.NOTESFRAIS_CHANNEL==='mike'?'Who was this meal with?':'Avec qui etait ce repas ?');return;}
+    if(form.category==='repas'&&!String(form.mealWith||'').trim()){setErr('Who was this meal with?');return;}
     if(!form.merchant){setErr('Merchant is required');return;}
     if(!form.amount||isNaN(parseFloat(form.amount))){setErr('Amount is required');return;}
     if(!form.paymentCard){setErr('Choose the payment card');return;}
@@ -1692,7 +1720,7 @@ function AddModal({onClose,onAdd,month}){
     try{
       let receiptPath=null,receiptName=null;
       if(file){const u=await uploadReceipt(file);receiptPath=u.path;receiptName=u.name;}
-      const mealPrefix=window.NOTESFRAIS_CHANNEL==='mike'?'With: ':'Avec: ';
+      const mealPrefix='With: ';
       const mealNote=form.category==='repas'&&form.mealWith?(mealPrefix+form.mealWith.trim()):'';
       const cardLabel=form.paymentCard==='entreprise'?'Payment card: company':form.paymentCard==='perso'?'Payment card: personal':'';
       const finalNote=[cardLabel,mealNote,form.note].filter(Boolean).join('\n');
@@ -1832,7 +1860,7 @@ function AddModal({onClose,onAdd,month}){
             <div><label style={lbl}>Amount CHF *</label><input style={typeof formInputStyle!=='undefined'?formInputStyle:inp} type="number" step="0.01" min="0" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} placeholder="0.00"/></div>
             <div><label style={lbl}>VAT CHF</label><input style={typeof formInputStyle!=='undefined'?formInputStyle:inp} type="number" step="0.01" min="0" value={form.tva} onChange={e=>setForm({...form,tva:e.target.value})} placeholder="0.00"/></div>
           </div>
-          <div><label style={lbl}>Date</label><input style={typeof formInputStyle!=='undefined'?formInputStyle:inp} type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} style={dateInputStyle}/></div><div data-payment-card-field="true"><label style={lbl}>Payment card *</label><select style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.paymentCard||''} onChange={e=>setForm({...form,paymentCard:e.target.value})}><option value="">Choose card...</option><option value="entreprise">Company card</option><option value="perso">Personal card</option></select></div><div><label style={lbl}>Category</label><select style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{CATS.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select></div>{form.category==='repas'&&<div><label style={lbl}>{window.NOTESFRAIS_CHANNEL==='mike'?'Who with? *':'Avec qui ? *'}</label><input required style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.mealWith||''} onChange={e=>setForm({...form,mealWith:e.target.value})} placeholder={window.NOTESFRAIS_CHANNEL==='mike'?'Client, colleagues, team...':'Client, collegues, equipe...'}/></div>}
+          <div><label style={lbl}>Date</label><input style={typeof formInputStyle!=='undefined'?formInputStyle:inp} type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} style={dateInputStyle}/></div><div data-payment-card-field="true"><label style={lbl}>Payment card *</label><select style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.paymentCard||''} onChange={e=>setForm({...form,paymentCard:e.target.value})}><option value="">Choose card...</option><option value="entreprise">Company card</option><option value="perso">Personal card</option></select></div><div><label style={lbl}>Category</label><select style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{CATS.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select></div>{form.category==='repas'&&<div><label style={lbl}>{'Who with? *'}</label><input required style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.mealWith||''} onChange={e=>setForm({...form,mealWith:e.target.value})} placeholder={'Client, colleagues, team...'}/></div>}
           <div><label style={lbl}>Note</label><input style={typeof formInputStyle!=='undefined'?formInputStyle:inp} value={form.note} onChange={e=>setForm({...form,note:e.target.value})} placeholder="Optional..."/></div>
         </div>
         {err&&<div style={{background:'var(--rl)',color:'var(--red)',borderRadius:8,padding:'8px 12px',fontSize:13,marginTop:10}}>{err}</div>}
@@ -1852,7 +1880,7 @@ function UBSModal({onClose,onImport}){
   const [error,setError]=useState(null);
   const [drag,setDrag]=useState(false);
   const fRef=useRef();
-  const process=text=>{setError(null);try{const r=parseUBS(text);if(r.rows.length===0){setError('Aucune transaction détectée.');return;}setParsed(r);setStep('preview');}catch(e){setError('Erreur: '+e.message);}};
+  const process=text=>{setError(null);try{const r=parseUBS(text);if(r.rows.length===0){setError('No transaction found in this file.');return;}setParsed(r);setStep('preview');}catch(e){setError('Erreur: '+e.message);}};
   const hFile=f=>{const r=new FileReader();r.onload=e=>process(e.target.result);r.readAsText(f,'UTF-8');};
   const exp=parsed?.rows.filter(r=>r.amount<0)||[];
   const inc=parsed?.rows.filter(r=>r.amount>0)||[];
@@ -1886,11 +1914,11 @@ function UBSModal({onClose,onImport}){
             {[{l:'Expenses',v:exp.length,bg:'var(--rl)',c:'var(--red)'},{l:'Income',v:inc.length,bg:'var(--gl)',c:'var(--green)'},{l:'Total',v:parsed.rows.length,bg:'var(--al)',c:'var(--accent)'}].map(s=>(<div key={s.l} style={{background:s.bg,borderRadius:10,padding:'10px 8px',textAlign:'center'}}><div style={{fontSize:20,fontWeight:700,fontFamily:'DM Mono',color:s.c}}>{s.v}</div><div style={{fontSize:10,color:s.c,marginTop:2}}>{s.l}</div></div>))}
           </div>
           <div style={{maxHeight:260,overflowY:'auto',background:'var(--s2)',borderRadius:10,padding:8,marginBottom:14}}>
-            {exp.slice(0,20).map((r,i)=>(<div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 10px',borderBottom:i<exp.slice(0,20).length-1?'0.5px solid var(--border)':'none',fontSize:12,gap:10}}><div style={{minWidth:0,flex:1}}><div style={{fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.label||'Sans libellé'}</div><div style={{color:'var(--t3)',fontSize:11,marginTop:2}}>{fd(r.date)}</div></div><div style={{fontFamily:'DM Mono',fontWeight:600,color:'var(--red)',whiteSpace:'nowrap'}}>CHF {fmt(Math.abs(r.amount))}</div></div>))}
+            {exp.slice(0,20).map((r,i)=>(<div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 10px',borderBottom:i<exp.slice(0,20).length-1?'0.5px solid var(--border)':'none',fontSize:12,gap:10}}><div style={{minWidth:0,flex:1}}><div style={{fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.label||'No label'}</div><div style={{color:'var(--t3)',fontSize:11,marginTop:2}}>{fd(r.date)}</div></div><div style={{fontFamily:'DM Mono',fontWeight:600,color:'var(--red)',whiteSpace:'nowrap'}}>CHF {fmt(Math.abs(r.amount))}</div></div>))}
           </div>
           <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:8}}>
             <button onClick={()=>setStep('upload')} style={{...bS,justifyContent:'center'}}>← Back</button>
-            <button onClick={()=>{onImport(parsed.rows);clearExpenseDraft();onClose();}} style={{...bP,justifyContent:'center'}}>✓ Importer {parsed.rows.length} lignes</button>
+            <button onClick={()=>{onImport(parsed.rows);clearExpenseDraft();onClose();}} style={{...bP,justifyContent:'center'}}>✓ Import {parsed.rows.length} rows</button>
           </div>
         </>}
       </div>
@@ -1935,7 +1963,7 @@ function StatsTab({expenses,month,months}){
         <div style={panel}><div style={{fontWeight:700,marginBottom:14}}>Breakdown by category</div>{bycat.map(c=>{const p=Math.round(c.total/maxCat*100);const share=total?Math.round(c.total/total*100):0;return <div key={c.id} style={{marginBottom:13}}><div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:6}}><span style={{fontWeight:700}}>{c.icon} {c.label}</span><span style={{fontFamily:'DM Mono',fontWeight:800}}>CHF {fmt(c.total)} <span style={{fontFamily:'DM Sans',fontWeight:500,color:'var(--t3)',fontSize:11}}>({share}%)</span></span></div><div style={{height:7,background:'var(--s2)',borderRadius:99,overflow:'hidden'}}><div style={{width:p+'%',height:'100%',background:'var(--accent)',borderRadius:99}}/></div></div>})}</div>
         <div style={panel}><div style={{fontWeight:700,marginBottom:14}}>Payment card</div>{cards.length===0?<div style={{fontSize:13,color:'var(--t3)'}}>No card selected.</div>:cards.map(r=>{const p=Math.round(r.total/maxCard*100);return <div key={r.label} style={{marginBottom:13}}><div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,marginBottom:6}}><span style={{fontWeight:700}}>💳 {r.label}</span><span style={{fontFamily:'DM Mono',fontWeight:800}}>CHF {fmt(r.total)}</span></div><div style={{height:7,background:'var(--s2)',borderRadius:99,overflow:'hidden'}}><div style={{width:p+'%',height:'100%',background:r.color,borderRadius:99}}/></div><div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>{r.items.length} expenses</div></div>})}</div>
       </div>
-      <div style={panel}><div style={{fontWeight:700,marginBottom:14}}>Monthly evolution</div>{bymonth.length===0?<div style={{fontSize:13,color:'var(--t3)'}}>Aucun mois avec expenses.</div>:bymonth.map(m=>{const p=Math.round(m.total/maxMonth*100);return <div key={m.v} style={{display:'grid',gridTemplateColumns:isMobile?'82px 1fr':'120px 1fr 125px',alignItems:'center',gap:10,marginBottom:10}}><div style={{fontSize:13,fontWeight:700}}>{m.l.replace(' 2026','')}</div><div style={{height:10,background:'var(--s2)',borderRadius:99,overflow:'hidden'}}><div style={{width:p+'%',height:'100%',background:'linear-gradient(90deg,#2D5BE3,#0F6E56)',borderRadius:99}}/></div><div style={{fontSize:12,fontFamily:'DM Mono',fontWeight:800,textAlign:isMobile?'left':'right'}}>CHF {fmt(m.total)} · {m.count}</div></div>})}</div>
+      <div style={panel}><div style={{fontWeight:700,marginBottom:14}}>Monthly evolution</div>{bymonth.length===0?<div style={{fontSize:13,color:'var(--t3)'}}>No month with expenses.</div>:bymonth.map(m=>{const p=Math.round(m.total/maxMonth*100);return <div key={m.v} style={{display:'grid',gridTemplateColumns:isMobile?'82px 1fr':'120px 1fr 125px',alignItems:'center',gap:10,marginBottom:10}}><div style={{fontSize:13,fontWeight:700}}>{m.l.replace(' 2026','')}</div><div style={{height:10,background:'var(--s2)',borderRadius:99,overflow:'hidden'}}><div style={{width:p+'%',height:'100%',background:'linear-gradient(90deg,#2D5BE3,#0F6E56)',borderRadius:99}}/></div><div style={{fontSize:12,fontFamily:'DM Mono',fontWeight:800,textAlign:isMobile?'left':'right'}}>CHF {fmt(m.total)} · {m.count}</div></div>})}</div>
     </>}
   </div>;
 }
@@ -2844,7 +2872,7 @@ function App(){
 
         {(tab==='history'||(tab==='expenses'&&window.notesFraisRole!=='finance'))&&<div data-nfm-expenses="1" style={{maxWidth:isMobile?'100%':800}}><PeriodHeader title={'Expenses'} subtitle={ML+' · '+fil.length+' expenses · '+fil.filter(e=>e.receiptPath||e.receiptUrl).length+' with receipt'} periodMode={periodMode} setPeriodMode={setPeriodMode} month={month} setMonth={setMonth} periodFrom={periodFrom} setPeriodFrom={setPeriodFrom} periodTo={periodTo} setPeriodTo={setPeriodTo} monthCounts={monthCounts}/>{window.notesFraisRole!=='finance'&&periodMode==='month'&&<div data-user-submit-placement="true" style={{background:'#fff',border:'0.5px solid var(--border)',borderRadius:16,padding:isMobile?14:16,marginBottom:14,display:'flex',alignItems:isMobile?'stretch':'center',justifyContent:'space-between',gap:12,flexDirection:isMobile?'column':'row',boxShadow:'0 8px 24px rgba(26,26,26,0.04)'}}><React.Fragment>{isMobile&&offlineCount>0&&<div className="nfm-banner nfm-banner-offline" style={{margin:'0 0 14px'}}>  <div className="nfm-count">{offlineCount}</div>  <div style={{minWidth:0}}>    <div className="nfm-banner-t">{'Offline \u2014 '+offlineCount+' expense'+(offlineCount>1?'s':'')+' kept on this iPhone'}</div>    <div className="nfm-banner-s">Nothing is lost. They upload by themselves as soon as you have signal.</div>  </div></div>}{isMobile&&submissionStatus==='submitted'&&<div className="nfm-banner nfm-banner-closed" style={{margin:'0 0 14px'}}>  <div className="nfm-tag">CLOSED</div>  <div className="nfm-banner-s">{ML+' submitted. Read-only from here.'}</div></div>}<div className="nfm-sum-head">  <div>    <div className="nfm-sum-label">TOTAL THIS MONTH</div>    <div className="nfm-sum-total">{'CHF '+fmt(mT)}</div>  </div>  <div className={submissionStatus==='submitted'?'nfm-badge nfm-badge-closed':'nfm-badge nfm-badge-open'}>{submissionStatus==='submitted'?'Submitted':offlineCount>0?(offlineCount+' waiting to sync'):'In progress'}</div></div><div className="nfm-sum-grid">  <div><div className="nfm-sum-k">VAT recoverable</div><div className="nfm-sum-v">{'CHF '+fmt(tva)}</div></div>  <div><div className="nfm-sum-k">Matched with UBS</div><div className="nfm-sum-v">{ubsLoaded?(rec.length+' / '+mE.length):('\u2014 / '+mE.length)}</div></div></div><div className="nfm-track"><i style={{width:(ubsLoaded&&mE.length?Math.round(rec.length/mE.length*100):0)+'%'}}/></div>{isMobile&&submissionStatus!=='submitted'&&<button type="button" className="nfm-add-link" onClick={()=>setShowAdd(true)}>+ Add expense</button>}</React.Fragment><button type="button" disabled={mE.length===0||syncing||mE.some(e=>e.submissionStatus==='submitted')} onClick={async()=>{if(mE.length===0||syncing||mE.some(e=>e.submissionStatus==='submitted'))return;let timers=[];setSyncing(true);setSubmissionStep('Preparing receipt ZIP');try{timers=[setTimeout(()=>setSubmissionStep('Sending email to finance'),1400),setTimeout(()=>setSubmissionStep('Closing the month'),5200)];const out=await notesFraisApi('/api/monthly-submission',{method:'POST',body:JSON.stringify({month}),timeoutMs:90000});const ids=new Set((out.data||[]).map(item=>String(item.id)));setExpenses(prev=>prev.map(item=>ids.has(String(item.id))?{...item,submissionStatus:'submitted',submittedAt:out.submittedAt}:item));setSubmissionStep('Done');notify('Month submitted to finance. Receipt ZIP sent.');}catch(err){const msg='Submission failed: '+(err&&err.message?err.message:String(err));notify(msg);alert(msg);}finally{timers.forEach(clearTimeout);setTimeout(()=>setSubmissionStep(''),650);setSyncing(false);}}} style={{...bP,justifyContent:'center',minWidth:isMobile?'100%':210,opacity:(mE.length===0||mE.some(e=>e.submissionStatus==='submitted'))?0.6:1}}>{mE.some(e=>e.submissionStatus==='submitted')?'Already submitted':syncing?(submissionStep||'Submitting...'):'Submit '+ML}</button></div>}{tab==='history'&&<div data-submit-month-card="true" style={{background:'#fff',border:'0.5px solid var(--border)',borderRadius:12,padding:isMobile?14:16,marginBottom:16,display:'flex',alignItems:isMobile?'stretch':'center',justifyContent:'space-between',gap:12,flexDirection:isMobile?'column':'row'}}><div><div style={{fontWeight:800,fontSize:15}}>Monthly submission</div><div style={{fontSize:12,color:'var(--t3)',marginTop:3}}>{periodMode==='month'?ML+' · '+mE.length+' expenses ready':'Choose a month before submitting to finance'}</div></div><button disabled={mE.length===0||syncing||submissionStatus==='submitted'} onClick={()=>{if(periodMode!=='month'){setPeriodMode('month');notify('Choose the month to submit');return;}setShowSubmitSummary(true);}} style={{...bP,justifyContent:'center',opacity:(mE.length===0||syncing||submissionStatus==='submitted')?0.55:1,minWidth:isMobile?'100%':220}}>{submissionStatus==='submitted'?'Already submitted':syncing?'Submitting...':'Submit to finance'}</button></div>}<div style={{marginBottom:12}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search receipt, amount, merchant..." style={{...inp,background:'#fff',fontSize:isMobile?16:13,padding:isMobile?'12px 14px':'9px 12px'}}/></div><div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>{[{id:'all',label:'All',icon:''},...CATS].map(c=><button key={c.id} className={filterCat===c.id?'nf-ios-filter-active':''} aria-pressed={filterCat===c.id} onClick={()=>setFilterCat(c.id)} style={{padding:'6px 14px',borderRadius:20,fontSize:12,cursor:'pointer',border:filterCat===c.id?'2px solid var(--accent)':'0.5px solid var(--border)',background:filterCat===c.id?'var(--al)':'#fff',color:filterCat===c.id?'var(--accent)':'var(--t2)',fontWeight:filterCat===c.id?500:400}}>{isMobile?c.label:(c.icon?`${c.icon} ${c.label}`:c.label)}</button>)}</div>{fil.length>0&&<div className="nfm-strip">  <span>{fil.length+' EXPENSE'+(fil.length===1?'':'S')+' \u00b7 '+fil.filter(e=>e.receiptPath||e.receiptUrl).length+' WITH RECEIPT'}</span>  <b>{'CHF '+fmt(fil.reduce((t,e)=>t+(Number(e.amountCHF||e.amount)||0),0))}</b></div>}{fil.length===0?<div style={{textAlign:'center',padding:'60px 20px',color:'var(--t3)'}}><div style={{fontSize:48,marginBottom:12}}>📝</div><div style={{fontWeight:500,fontSize:16,marginBottom:4}}>No expenses for this month</div><div className="nfm-empty-hint">Photograph a receipt when you pay. The amount, VAT, date and merchant are read for you.</div><button onClick={()=>setShowAdd(true)} style={{...bP,display:'inline-flex',marginTop:12}}>+ Add expense</button></div>:<div style={{background:'#fff',borderRadius:12,border:'0.5px solid var(--border)',overflow:'hidden'}}>{fil.map((e,i)=><div key={e.id} className="nf-ios-expense-row" style={{display:'flex',gap:14,alignItems:isMobile?'stretch':'center',flexDirection:isMobile?'column':'row',padding:'14px 18px',borderBottom:i<fil.length-1?'0.5px solid var(--border)':'none'}}><div style={{width:44,height:44,borderRadius:10,background:CMAP[e.category]?.color||'#eee',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>{CMAP[e.category]?.icon||'📎'}</div><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:14,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{e.merchant}</div><div style={{fontSize:12,color:'var(--t3)',marginTop:3,display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}><span>{fd(e.date)}</span><Badge status={e.status}/>{getPaymentCardLabel(e.note)&&<span style={{background:'var(--al)',color:'var(--accent)',borderRadius:999,padding:'2px 7px',fontWeight:600}}>{getPaymentCardLabel(e.note)}</span>}{cleanPaymentCardNote(e.note)&&<span>· {cleanPaymentCardNote(e.note)}</span>}</div>{e.ubsRow&&<div style={{fontSize:11,color:'var(--green)',marginTop:3}}>↳ UBS: {e.ubsRow.label}</div>}</div><UserReceiptPreview expense={e} setViewer={setViewer}/><div style={{textAlign:isMobile?'left':'right',flexShrink:0,minWidth:isMobile?'100%':90,width:isMobile?'100%':'auto'}}><div style={{fontWeight:700,fontFamily:'DM Mono',fontSize:15}}>{isMobile?'':'CHF '}{fmt(e.amountCHF||e.amount)}</div>{e.tva>0&&<div style={{fontSize:11,color:'var(--t3)'}}>VAT {fmt(e.tva)}</div>}<div style={{display:'flex',gap:8,justifyContent:isMobile?'flex-start':'flex-end',marginTop:4,alignItems:'center'}}>{(e.receiptPath||e.receiptUrl)&&<button onClick={()=>setViewer({path:e.receiptPath||e.receiptUrl,name:e.receiptName||'receipt'})} title="View receipt" style={{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontSize:15,padding:2,lineHeight:1}}>View</button>}{e.submissionStatus==='submitted'?<span style={{fontSize:11,fontWeight:800,color:'var(--t3)',background:'var(--s2)',padding:'6px 9px',borderRadius:999}}>Closed</span>:<><button type="button" onClick={()=>setEditingExpense(e)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontSize:13,fontWeight:800,padding:4}} title="Edit">{isMobile?'✏️':'Edit'}</button><button onClick={()=>deleteExpense(e.id,e.receiptPath||e.receiptUrl)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--t3)',fontSize:14,padding:2}} title="Delete">🗑</button></>}</div></div></div>)}</div>}</div>}
 
-        {tab==='recon'&&<div style={{maxWidth:isMobile?'100%':680}}><PeriodHeader title={'UBS statement'} subtitle={'Automatic matching · '+ML} periodMode={periodMode} setPeriodMode={setPeriodMode} month={month} setMonth={setMonth} periodFrom={periodFrom} setPeriodFrom={setPeriodFrom} periodTo={periodTo} setPeriodTo={setPeriodTo} monthCounts={monthCounts}/>{!ubsLoaded?<div style={{textAlign:'center',padding:'60px 20px',background:'#fff',borderRadius:12,border:'0.5px solid var(--border)'}}><div style={{fontSize:56,marginBottom:16}}>🏦</div><div style={{fontWeight:600,fontSize:17,marginBottom:8}}>No UBS statement imported</div><div style={{fontSize:13,color:'var(--t3)',marginBottom:24,lineHeight:1.7}}>Import the UBS e-banking CSV for automatic matching</div><button onClick={()=>setShowUBS(true)} style={{...bP,fontSize:14,padding:'12px 24px'}}>🏦 Import UBS statement</button></div>:<><div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:12,marginBottom:20}}>{[{l:'Matched',v:rec.length,bg:'var(--gl)',c:'var(--green)'},{l:'Pending',v:pend.length,bg:'var(--aml)',c:'var(--amber)'},{l:'Missing',v:forgotten.length,bg:'var(--rl)',c:'var(--red)'}].map(s=><div key={s.l} style={{background:s.bg,borderRadius:12,padding:16,textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,fontFamily:'DM Mono',color:s.c}}>{s.v}</div><div style={{fontSize:12,color:s.c,marginTop:4}}>{s.l}</div></div>)}</div>{rec.length>0&&<div style={{marginBottom:20}}><div style={{fontSize:12,fontWeight:600,color:'var(--green)',marginBottom:10}}>✅ Matched avec UBS</div><div style={{background:'#fff',borderRadius:12,border:'0.5px solid var(--border)',overflow:'hidden'}}>{rec.map((e,i)=><div key={e.id} style={{display:'flex',justifyContent:'space-between',alignItems:isMobile?'stretch':'center',flexDirection:isMobile?'column':'row',padding:'12px 18px',borderBottom:i<rec.length-1?'0.5px solid var(--border)':'none',gap:12}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500}}>{e.merchant}</div><div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>{fd(e.date)}</div>{e.ubsRow&&<div style={{fontSize:11,color:'var(--green)',marginTop:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>↳ {e.ubsRow.label}</div>}</div><Thumb path={e.receiptPath||e.receiptUrl} name={e.receiptName} onView={(e.receiptPath||e.receiptUrl)?()=>setViewer({path:e.receiptPath||e.receiptUrl,name:e.receiptName||'receipt'}):null}/><div style={{textAlign:isMobile?'left':'right',flexShrink:0,width:isMobile?'100%':'auto'}}><div style={{fontFamily:'DM Mono',fontWeight:700}}>CHF {fmt(e.amountCHF||e.amount)}</div>{e.amtDiff&&Math.abs(e.amtDiff)>0.005?<div style={{fontSize:11,color:'var(--amber)'}}>Écart {fmt(e.amtDiff)}</div>:null}</div></div>)}</div></div>}{forgotten.length>0&&<div style={{marginBottom:20}}><div style={{fontSize:12,fontWeight:600,color:'var(--red)',marginBottom:10}}>⚠ In UBS - no receipt</div><div style={{display:'grid',gap:8}}>{forgotten.map((f,i)=><div key={i} style={{background:'var(--rl)',borderRadius:10,padding:'12px 16px',border:'0.5px solid #F7C1C1',display:'flex',justifyContent:'space-between',flexDirection:isMobile?'column':'row',alignItems:isMobile?'stretch':'center',gap:isMobile?10:0}}><div><div style={{fontWeight:500,color:'#791F1F'}}>{f.label}</div><div style={{fontSize:11,color:'#A32D2D',marginTop:2}}>{fd(f.date)}</div></div><div style={{display:'flex',gap:10,alignItems:'center',justifyContent:isMobile?'space-between':'flex-end'}}><span style={{fontFamily:'DM Mono',fontWeight:700,color:'var(--red)'}}>CHF {fmt(Math.abs(f.amount))}</span><button onClick={()=>addForgotten(f)} style={{...bS,padding:'6px 12px',fontSize:12,color:'var(--red)',borderColor:'#F09595'}}>+ Create</button></div></div>)}</div></div>}{pend.length>0&&<div><div style={{fontSize:12,fontWeight:600,color:'var(--amber)',marginBottom:10}}>⏳ Entered - not found in UBS</div><div style={{background:'#fff',borderRadius:12,border:'0.5px solid var(--border)',overflow:'hidden'}}>{pend.map((e,i)=><div key={e.id} style={{display:'flex',justifyContent:'space-between',alignItems:isMobile?'stretch':'center',flexDirection:isMobile?'column':'row',padding:'12px 18px',borderBottom:i<pend.length-1?'0.5px solid var(--border)':'none',gap:12}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500}}>{e.merchant}</div><div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>{fd(e.date)}</div></div><Thumb path={e.receiptPath||e.receiptUrl} name={e.receiptName} onView={(e.receiptPath||e.receiptUrl)?()=>setViewer({path:e.receiptPath||e.receiptUrl,name:e.receiptName||'receipt'}):null}/><span style={{fontFamily:'DM Mono',fontWeight:700,color:'var(--amber)',flexShrink:0,alignSelf:isMobile?'flex-start':'auto'}}>CHF {fmt(e.amountCHF||e.amount)}</span></div>)}</div></div>}<button onClick={()=>setShowUBS(true)} style={{...bS,marginTop:16}}>🔄 Import a new UBS statement</button></>}</div>}
+        {tab==='recon'&&<div style={{maxWidth:isMobile?'100%':680}}><PeriodHeader title={'UBS statement'} subtitle={'Automatic matching · '+ML} periodMode={periodMode} setPeriodMode={setPeriodMode} month={month} setMonth={setMonth} periodFrom={periodFrom} setPeriodFrom={setPeriodFrom} periodTo={periodTo} setPeriodTo={setPeriodTo} monthCounts={monthCounts}/>{!ubsLoaded?<div style={{textAlign:'center',padding:'60px 20px',background:'#fff',borderRadius:12,border:'0.5px solid var(--border)'}}><div style={{fontSize:56,marginBottom:16}}>🏦</div><div style={{fontWeight:600,fontSize:17,marginBottom:8}}>No UBS statement imported</div><div style={{fontSize:13,color:'var(--t3)',marginBottom:24,lineHeight:1.7}}>Import the UBS e-banking CSV for automatic matching</div><button onClick={()=>setShowUBS(true)} style={{...bP,fontSize:14,padding:'12px 24px'}}>🏦 Import UBS statement</button></div>:<><div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:12,marginBottom:20}}>{[{l:'Matched',v:rec.length,bg:'var(--gl)',c:'var(--green)'},{l:'Pending',v:pend.length,bg:'var(--aml)',c:'var(--amber)'},{l:'Missing',v:forgotten.length,bg:'var(--rl)',c:'var(--red)'}].map(s=><div key={s.l} style={{background:s.bg,borderRadius:12,padding:16,textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,fontFamily:'DM Mono',color:s.c}}>{s.v}</div><div style={{fontSize:12,color:s.c,marginTop:4}}>{s.l}</div></div>)}</div>{rec.length>0&&<div style={{marginBottom:20}}><div style={{fontSize:12,fontWeight:600,color:'var(--green)',marginBottom:10}}>✅ Matched avec UBS</div><div style={{background:'#fff',borderRadius:12,border:'0.5px solid var(--border)',overflow:'hidden'}}>{rec.map((e,i)=><div key={e.id} style={{display:'flex',justifyContent:'space-between',alignItems:isMobile?'stretch':'center',flexDirection:isMobile?'column':'row',padding:'12px 18px',borderBottom:i<rec.length-1?'0.5px solid var(--border)':'none',gap:12}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500}}>{e.merchant}</div><div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>{fd(e.date)}</div>{e.ubsRow&&<div style={{fontSize:11,color:'var(--green)',marginTop:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>↳ {e.ubsRow.label}</div>}</div><Thumb path={e.receiptPath||e.receiptUrl} name={e.receiptName} onView={(e.receiptPath||e.receiptUrl)?()=>setViewer({path:e.receiptPath||e.receiptUrl,name:e.receiptName||'receipt'}):null}/><div style={{textAlign:isMobile?'left':'right',flexShrink:0,width:isMobile?'100%':'auto'}}><div style={{fontFamily:'DM Mono',fontWeight:700}}>CHF {fmt(e.amountCHF||e.amount)}</div>{e.amtDiff&&Math.abs(e.amtDiff)>0.005?<div style={{fontSize:11,color:'var(--amber)'}}>Difference {fmt(e.amtDiff)}</div>:null}</div></div>)}</div></div>}{forgotten.length>0&&<div style={{marginBottom:20}}><div style={{fontSize:12,fontWeight:600,color:'var(--red)',marginBottom:10}}>⚠ In UBS - no receipt</div><div style={{display:'grid',gap:8}}>{forgotten.map((f,i)=><div key={i} style={{background:'var(--rl)',borderRadius:10,padding:'12px 16px',border:'0.5px solid #F7C1C1',display:'flex',justifyContent:'space-between',flexDirection:isMobile?'column':'row',alignItems:isMobile?'stretch':'center',gap:isMobile?10:0}}><div><div style={{fontWeight:500,color:'#791F1F'}}>{f.label}</div><div style={{fontSize:11,color:'#A32D2D',marginTop:2}}>{fd(f.date)}</div></div><div style={{display:'flex',gap:10,alignItems:'center',justifyContent:isMobile?'space-between':'flex-end'}}><span style={{fontFamily:'DM Mono',fontWeight:700,color:'var(--red)'}}>CHF {fmt(Math.abs(f.amount))}</span><button onClick={()=>addForgotten(f)} style={{...bS,padding:'6px 12px',fontSize:12,color:'var(--red)',borderColor:'#F09595'}}>+ Create</button></div></div>)}</div></div>}{pend.length>0&&<div><div style={{fontSize:12,fontWeight:600,color:'var(--amber)',marginBottom:10}}>⏳ Entered - not found in UBS</div><div style={{background:'#fff',borderRadius:12,border:'0.5px solid var(--border)',overflow:'hidden'}}>{pend.map((e,i)=><div key={e.id} style={{display:'flex',justifyContent:'space-between',alignItems:isMobile?'stretch':'center',flexDirection:isMobile?'column':'row',padding:'12px 18px',borderBottom:i<pend.length-1?'0.5px solid var(--border)':'none',gap:12}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500}}>{e.merchant}</div><div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>{fd(e.date)}</div></div><Thumb path={e.receiptPath||e.receiptUrl} name={e.receiptName} onView={(e.receiptPath||e.receiptUrl)?()=>setViewer({path:e.receiptPath||e.receiptUrl,name:e.receiptName||'receipt'}):null}/><span style={{fontFamily:'DM Mono',fontWeight:700,color:'var(--amber)',flexShrink:0,alignSelf:isMobile?'flex-start':'auto'}}>CHF {fmt(e.amountCHF||e.amount)}</span></div>)}</div></div>}<button onClick={()=>setShowUBS(true)} style={{...bS,marginTop:16}}>🔄 Import a new UBS statement</button></>}</div>}
 
         {tab==='stats'&&<StatsTab expenses={expenses} month={month} months={MONTHS}/>}
         {tab==='finance'&&window.notesFraisRole==='finance'&&<FinanceDashboardTab expenses={expenses} months={MONTHS} setMonth={setMonth} setTab={setTab} setPeriodMode={setPeriodMode}/>}

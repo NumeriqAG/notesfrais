@@ -93,7 +93,7 @@
       new Worker(url).terminate();
       return 'blob worker OK';
     }catch(err){
-      return 'blob worker BLOQUE ('+((err&&err.name)||'Error')+')';
+      return 'blob worker BLOCKED ('+((err&&err.name)||'Error')+')';
     }finally{
       if(url)URL.revokeObjectURL(url);
     }
@@ -101,8 +101,8 @@
   // « undefined » remonte tel quel dans un catch : sans description robuste,
   // le bandeau affichait une cause vide, ce qui n'apprend rien.
   function describeError(e){
-    if(e===undefined)return 'rejet undefined';
-    if(e===null)return 'rejet null';
+    if(e===undefined)return 'rejected with undefined';
+    if(e===null)return 'rejected with null';
     if(typeof e==='string')return e.slice(0,170);
     const bits=[];
     if(e.name)bits.push(e.name);
@@ -114,20 +114,46 @@
     }
     return bits.join(': ').slice(0,170);
   }
+  // La sonde precedente creait un worker blob: vide et le declarait OK. Mais
+  // Tesseract, lui, y execute un importScripts vers jsdelivr : c'est CE geste
+  // qu'il faut reproduire. Un echec la-dedans tue le worker avant qu'il emette
+  // le moindre statut — exactement ce que l'appareil rapporte.
+  function probeWorkerImport(){
+    return new Promise(resolve=>{
+      let url=null,worker=null,timer=null;
+      const done=verdict=>{
+        if(timer)clearTimeout(timer);
+        try{if(worker)worker.terminate();}catch(_){}
+        if(url)URL.revokeObjectURL(url);
+        resolve(verdict);
+      };
+      try{
+        const body="try{importScripts('https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/worker.min.js');"
+          +"postMessage('OK');}catch(e){postMessage('KO '+((e&&e.message)||e||'no message'));}";
+        url=URL.createObjectURL(new Blob([body],{type:'text/javascript'}));
+        worker=new Worker(url);
+        timer=setTimeout(()=>done('importScripts NO REPLY after 8s'),8000);
+        worker.onmessage=event=>done('importScripts '+event.data);
+        worker.onerror=event=>done('importScripts KILLED THE WORKER: '+((event&&event.message)||'no message'));
+      }catch(err){
+        done('worker creation refused: '+((err&&err.name)||'Error'));
+      }
+    });
+  }
   const runOCR=async(imgFile)=>{
     if(!imgFile.type.startsWith('image/'))return;
     setOcrStatus('scanning');setOcrProgress(0);setOcrReason('');
     // L'etape est la seule chose qui situe la panne quand l'erreur est vide.
-    let stage='depart';
+    let stage='start';
     let preparedKo=0;
     // Tesseract annonce ou il en est : « loading tesseract core »,
     // « initializing tesseract », « loading language traineddata »,
     // « initializing api », « recognizing text ». Quand il rejette avec
     // undefined, ce dernier statut est la seule chose qui situe la panne.
-    let lastStatus='(aucun statut)';
+    let lastStatus='(none yet)';
     let workerError='';
     try{
-      stage='chargement Tesseract';
+      stage='loading Tesseract';
       if(!window.Tesseract){
         await new Promise((resolve,reject)=>{
           const s=document.createElement('script');
@@ -137,10 +163,10 @@
           document.head.appendChild(s);
         });
       }
-      stage='pretraitement image';
+      stage='preprocessing image';
       const prepared=await preprocessReceiptImage(imgFile);
       preparedKo=Math.round((prepared&&prepared.size||0)/1024);
-      stage='lecture ('+preparedKo+' Ko)';
+      stage='reading ('+preparedKo+' KB)';
       // Tesseract telecharge son worker, son WASM et deux jeux de donnees de
       // langue. Sans borne, une de ces requetes qui n'aboutit jamais laisse la
       // barre a 0% indefiniment, sans message.
@@ -166,10 +192,10 @@
       }catch(first){
         // 'fra+eng' telecharge deux jeux de donnees ; si l'un des deux
         // n'arrive pas, une lecture en anglais seul vaut mieux que rien.
-        stage='lecture eng seul apres echec fra+eng ['+lastStatus+' \u2192 '+describeError(first)+']';
+        stage='eng-only retry after fra+eng failed ['+lastStatus+' \u2192 '+describeError(first)+']';
         result=await read('eng');
       }
-      stage='extraction des champs';
+      stage='extracting fields';
       const fields=extractReceiptFields(result.data.text||'');
       setForm(f=>({...f,merchant:fields.merchant||f.merchant,amount:fields.total?fields.total.toFixed(2):f.amount,tva:fields.tva?fields.tva.toFixed(2):f.tva,date:fields.date||f.date}));
       setOcrStatus('done');
@@ -178,14 +204,16 @@
       const build=typeof NOTESFRAIS_BUILD==='string'?NOTESFRAIS_BUILD:'?';
       const detail=[
         stage+' \u2192 '+describeError(e),
-        'dernier statut: '+lastStatus,
+        'last status: '+lastStatus,
         workerError?('worker: '+workerError):'',
-        'image '+preparedKo+' Ko',
+        'image '+preparedKo+' KB',
         probeBlobWorker(),
+        window.Tesseract&&window.Tesseract.version?('tesseract '+window.Tesseract.version):'',
         'build '+build
       ].filter(Boolean).join(' \u00b7 ');
       setOcrReason(detail);
       setOcrStatus('error');
+      probeWorkerImport().then(verdict=>setOcrReason(detail+' \u00b7 '+verdict));
     }
   };
 `;

@@ -191,17 +191,20 @@ check('le nom du fichier est visible',
 const ocrLabel = await page.locator('.nfm-ocr-l').innerText();
 check('l etat de lecture est annonce', ocrLabel.length > 0, ocrLabel);
 check('l echec d OCR est annonce', /Could not read/i.test(ocrLabel), ocrLabel);
+await page.waitForTimeout(9000);
 const amber = await page.locator('.nfm-note-amber').innerText();
 check('il rassure sur la photo', amber.includes('photo is kept'));
 // Sans la cause, la meme panne se represente et personne ne sait pourquoi.
 // L'etape est ce qui situe la panne quand l'erreur remontee est vide.
-check('il nomme l etape', /(chargement Tesseract|pretraitement image|lecture|extraction)/.test(amber),
+check('il nomme l etape', /(loading Tesseract|preprocessing image|reading|extracting)/.test(amber),
   amber.replace(/\s+/g, ' ').slice(0, 160));
 check('il decrit l erreur', /\u2192\s*\S/.test(amber),
   amber.replace(/\s+/g, ' ').slice(0, 160));
 // La sonde du worker blob: et l'identifiant de build voyagent avec la cause :
 // sans eux on ne distingue pas un correctif inefficace d'un shell perime.
-check('il sonde le worker blob:', /blob worker (OK|BLOQUE)/.test(amber),
+check('il sonde l importScripts du worker', /importScripts /.test(amber),
+  amber.replace(/\s+/g, ' ').slice(0, 200));
+check('il sonde le worker blob:', /blob worker (OK|BLOCKED)/.test(amber),
   amber.replace(/\s+/g, ' ').slice(0, 140));
 check('il donne le build', /build \d{4}-\d{2}-\d{2}/.test(amber),
   amber.replace(/\s+/g, ' ').slice(0, 140));

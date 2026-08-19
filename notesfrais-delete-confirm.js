@@ -7,7 +7,9 @@
     // Ce patch est charge en DERNIER, apres notesfrais-mike-en.js : ses chaines
     // ne passent donc pas par les paires de traduction et sont ecrites ici dans
     // les deux langues, comme le fait deja notesfrais-meal-context.js.
-    const EN = window.NOTESFRAIS_CHANNEL === 'mike';
+    // Les deux canaux utilisateur portent la meme interface anglaise : gater la
+    // langue sur le canal faisait rendre /test en francais dans une UI anglaise.
+    const EN = true;
     const t = {
       title:    EN ? 'Delete this expense?'                : 'Supprimer ce frais ?',
       plain:    EN ? 'This cannot be undone.'              : 'Cette action est définitive.',
