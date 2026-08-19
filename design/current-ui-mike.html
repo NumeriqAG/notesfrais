@@ -669,7 +669,7 @@ input,select,textarea,button{font-family:'DM Sans',sans-serif}
   .nfm-hero-s{font-size:13.5px;color:#8E8E93;text-align:center;line-height:1.45;max-width:240px}
   /* Les deux autres sources sortent de la carte : c'etaient des <span> dans
      un <button>, donc du decor imbrique et non cliquable. */
-  .nfm-hero-alt{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .nfm-hero-alt{display:grid;grid-template-columns:1fr;margin-top:8px}
   .nfm-hero-alt>button{
     min-height:46px;border:0;border-radius:14px;background:#fff;color:#1A3FB5;
     font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 0 0 .5px rgba(60,60,67,.13);
@@ -1316,7 +1316,7 @@ function getDefaultNotesFraisMonth(){
   return MONTHS.some(m=>m.v===current)?current:'2026-03';
 }
 const NOTESFRAIS_LOCALE_V1='en-GB';
-const NOTESFRAIS_BUILD='2026-08-19-h';
+const NOTESFRAIS_BUILD='2026-08-19-j';
 const fmt=n=>Number(n||0).toFixed(2);
 const fd=d=>{
   const raw=String(d||'').trim();
@@ -1762,8 +1762,7 @@ function AddModal({onClose,onAdd,month}){
       const el=fRef.current;
       if(!el)return;
       if(mode==='camera'){el.setAttribute('capture','environment');el.accept='image/*';}
-      else if(mode==='library'){el.removeAttribute('capture');el.accept='image/*';}
-      else{el.removeAttribute('capture');el.accept='application/pdf,image/*';}
+      else{el.removeAttribute('capture');el.accept='image/*,application/pdf';}
       el.value='';
       el.click();
     };
@@ -1784,8 +1783,7 @@ function AddModal({onClose,onAdd,month}){
                  <span className="nfm-hero-s">One tap opens the camera. Amount, VAT, date and merchant are filled in for you.</span>
                </button>
                <div className="nfm-hero-alt">
-                 <button type="button" data-nfm-source="library" onClick={()=>nfmPick('library')}>Photo library<small>a photo already taken</small></button>
-                 <button type="button" data-nfm-source="files" onClick={()=>nfmPick('files')}>Files<small>PDF, iCloud, Drive</small></button>
+                 <button type="button" data-nfm-source="files" onClick={()=>nfmPick('files')}>Choose a file<small>photo library, PDF, iCloud, Drive</small></button>
                </div>
              </React.Fragment>
             :<div className="nfm-shot">

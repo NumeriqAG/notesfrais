@@ -174,8 +174,9 @@ check('le pied touche le bas de l ecran',
 
 // capture="environment" n'ouvre que la camera sur iOS : les deux autres
 // sources doivent etre de vrais boutons, et l'entree ne doit pas naitre bridee.
-check('la photothèque est proposee', await page.locator('[data-nfm-source="library"]').count() === 1);
-check('les fichiers sont proposes', await page.locator('[data-nfm-source="files"]').count() === 1);
+check('une seule autre source est proposee',
+  await page.locator('.nfm-hero-alt button').count() === 1);
+check('elle mene aux fichiers', await page.locator('[data-nfm-source="files"]').count() === 1);
 check('l entree fichier n est pas bridee sur la camera',
   await page.evaluate(() => {
     const el = document.querySelector('[data-nfm-capture] input[type=file]');
@@ -183,7 +184,7 @@ check('l entree fichier n est pas bridee sur la camera',
   }));
 await page.locator('[data-nfm-source="files"]').click({ force: true });
 await page.waitForTimeout(400);
-check('« Files » accepte les PDF sans forcer la camera',
+check('elle accepte photos et PDF sans forcer la camera',
   await page.evaluate(() => {
     const el = document.querySelector('[data-nfm-capture] input[type=file]');
     return !!el && !el.hasAttribute('capture') && /application\/pdf/.test(el.accept);
