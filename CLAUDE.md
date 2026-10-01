@@ -159,7 +159,8 @@ Les deux outils ci-dessus valident la **syntaxe** du HTML produit ; celui-ci
 valide le **comportement**. Il ouvre l'app dans Chromium avec `/api/*` simulé,
 puis **clique** : capture d'un frais, enchaînement « Save and add another »,
 import d'un CSV UBS, suppression avec confirmation, soumission du mois,
-passage en janvier 2027 et retour sur décembre 2026. 67 assertions par canal,
+modification d'un frais, passage en janvier 2027 et retour sur décembre 2026.
+72 assertions par canal,
 plus un journal des appels API qui prouve qu'un clic a bien agi.
 
 **L'horloge du navigateur est fixée** (`page.clock.install`) au 20 août 2026,
@@ -313,6 +314,7 @@ l'époque Supabase et continuent de tourner grâce au shim.
 | 41 | `locale.js` | Dates formatées en `en-GB` au lieu de `fr-CH` en dur. |
 | 42 | `mobile-redesign.js` | Refonte mobile (feuille de capture, récapitulatif du mois, diagnostic OCR, `NOTESFRAIS_BUILD`). |
 | 43 | `year.js` | **Année active** : `MONTHS` = les 12 mois de l'année en cours, ou d'une année passée choisie dans les sélecteurs (« Other years », ou le sélecteur du mode « Full year »). Le choix recharge la page et vit en `sessionStorage`. Chargé en dernier, en anglais. |
+| 44 | `english-final.js` | **Dernier français visible** traduit sur le code final (UBS, réglages finance, stats, toasts, erreurs, `<title>`), et relecture des notes « Carte utilisee: … » déjà en base. Paires exactes : une cible qui dérive apparaît en no-op. `test-patches.js` interdit le retour de ces chaînes. |
 
 ---
 
@@ -497,16 +499,22 @@ le plus grave), `notesfrais-flow.js` (5), `notesfrais-english-ui.js` (2),
 grep -c 'Ã©\|Ã¨\|Ã \|â€' *.js *.html | grep -v ':0'
 ```
 
-Conséquences mesurées :
+Conséquences :
 
-- **14 des 125 paires de `mike-en.js` n'aboutissent pas.** C'était 33 avant la
-  migration : `english-ui.js` en rattrape la majorité. Deux libellés français
-  restent visibles dans l'UI anglaise — « Résumé avant soumission » et « Détail
-  par catégorie » (échantillon non exhaustif).
-- **Le toast « Scanner un autre » est inatteignable** : l'état et le JSX existent,
-  `setQuickAdd(true)` apparaît **0 fois** dans le HTML final.
-- **La croix de la modale d'ajout efface le brouillon** au lieu de le garder ;
-  seul « Garder en brouillon » préserve la saisie.
+- **14 des 125 paires de `mike-en.js` n'aboutissent pas.** Le français qui en
+  restait visible — et celui des patches écrits en français après les
+  traductions — est rattrapé depuis octobre 2026 par `english-final.js`, sur le
+  code final. Un balayage de chaque onglet, en utilisateur et en finance, n'en
+  trouve plus. Les fichiers eux-mêmes restent mal encodés : les ré-encoder ferait
+  soudain aboutir ces 14 paires, en amont de patches qui ciblent peut-être le
+  texte non traduit — à faire avec la baseline sous les yeux.
+- Les paires globales coupent aussi des mots : `['Soumis','Submitted']` avait
+  produit « Submittedsion », `['justificatif','receipt']` « non receiptperes ».
+  Toute nouvelle chaîne française qui contient un de ces mots en sera victime.
+- Le toast « Scan another » (`quickAdd`) est **du code mort** : la refonte
+  mobile l'a remplacé par « Save and add another ».
+- La croix qui effaçait le brouillon ne se reproduit plus : le formulaire est
+  sauvegardé à chaque frappe et la fermeture ne l'efface pas.
 
 ### B. ~~Tout est câblé sur 2026~~ — corrigé par `year.js`
 `MONTHS` était une liste littérale des douze mois de 2026 et le mois par défaut

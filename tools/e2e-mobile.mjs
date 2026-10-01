@@ -71,7 +71,8 @@ const expense = (id, day, merchant, amount, cat, status, note = '') => ({
 const rows = [
   expense(1, 3, 'Brasserie de la Paix', 67.2, 'repas', 'reconciled', 'Payment card: company'),
   expense(2, 5, 'SBB CFF Billetterie', 48, 'transport', 'reconciled', 'Payment card: company'),
-  expense(3, 11, 'Ibis Budget Lausanne', 89, 'hotel', 'pending', 'Payment card: personal'),
+  // Note au format qu'ecrivait l'edition avant octobre 2026 : il y en a en base.
+  expense(3, 11, 'Ibis Budget Lausanne', 89, 'hotel', 'pending', 'Carte utilisee: perso'),
   expense(4, 14, 'Coop Supermarche', 43.6, 'repas', 'pending', 'Payment card: company')
 ];
 
@@ -336,6 +337,32 @@ check('l import ne leve aucune erreur',
 check('la modale UBS est fermee',
   await page.locator('button').filter({ hasText: /Import(er)? \d+/ }).count() === 0);
 await shot('05-apres-ubs');
+
+// ── 6a · Modification ─────────────────────────────────────────────────
+// L'edition ecrivait « Carte utilisee: entreprise » quand tout le reste lit
+// « Payment card: company » : un frais modifie perdait son badge de carte.
+console.log('\n6a. Modification');
+await page.locator('#test-bottom-nav button:has-text("Expenses")').first().click({ force: true });
+await page.waitForTimeout(1500);
+const ibis = page.locator('.nf-ios-expense-row').filter({ hasText: 'Ibis' }).first();
+check('une note deja en base garde son badge de carte',
+  /Personal card/.test(await ibis.innerText().catch(() => '')),
+  (await ibis.innerText().catch(() => 'ligne absente')).replace(/\s+/g, ' ').slice(0, 120));
+check('elle n affiche pas la mention brute',
+  !/Carte utilisee/.test(await ibis.innerText().catch(() => '')));
+mark = calls.length;
+await ibis.locator('.nf-ios-expense-actions button').first().click({ force: true });
+await page.waitForTimeout(1200);
+const saveEdit = page.locator('button:has-text("Save changes")').first();
+check('la fiche de modification s ouvre', await saveEdit.count() === 1);
+if (await saveEdit.count()) {
+  await saveEdit.click({ force: true });
+  await page.waitForTimeout(2000);
+  const patch = since(mark).find(c => c.method === 'PATCH' && c.path === '/api/expenses');
+  const note = String(patch && (patch.body?.note ?? patch.body?.updates?.note ?? JSON.stringify(patch.body)) || '');
+  check('la modification part vers l API', !!patch);
+  check('elle enregistre la carte au format lu partout', /Payment card: personal/.test(note), note.slice(0, 120));
+}
 
 // ── 6 · Suppression ───────────────────────────────────────────────────
 console.log('\n6. Suppression');

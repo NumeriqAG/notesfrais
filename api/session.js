@@ -27,7 +27,7 @@ module.exports = async function handler(req, res) {
       const profile = authenticate(body.email, body.password);
       if (!profile) {
         await recordLoginFailure(req, body.email);
-        return sendJson(res, 401, { ok: false, error: 'Email ou mot de passe incorrect' });
+        return sendJson(res, 401, { ok: false, error: 'Incorrect email or password' });
       }
       await clearLoginFailures(req, body.email);
       res.setHeader('Set-Cookie', serializeCookie(makeSession(profile)));

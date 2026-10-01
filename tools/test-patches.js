@@ -158,6 +158,8 @@ const REQUIRED = {
     ['confirmation avant suppression : modale', 'data-nf-delete-confirm'],
     ['annee calculee, plus figee sur 2026', 'NOTESFRAIS_YEAR_V1'],
     ['retour possible sur une annee passee', 'function nfSwitchYear('],
+    ['plus de francais dans l UI anglaise', 'NOTESFRAIS_ENGLISH_FINAL_V1'],
+    ['une modification garde le badge de carte', "?'Payment card: company':'Payment card: personal'"],
     ['suppression jamais immediate', 'const deleteExpense=useCallback((id,receiptPath)=>{setPendingDelete'],
   ],
   test: [
@@ -185,6 +187,10 @@ const REQUIRED = {
 const FORBIDDEN = [
   ['pas de code d acces en dur', /MIKE2026|FINANCE2026|ACCESS_CODES/],
   ['plus de client Supabase', /supabase\.createClient\(SUPABASE/],
+  // Francais visible releve en octobre 2026 : s'il revient, une paire de
+  // notesfrais-english-final.js ne matche plus.
+  ['plus de francais visible', /Submittedsion|receiptperes|Expenses enregistr|R\u00e9sum\u00e9 avant soumission|D\u00e9tail par cat\u00e9gorie|Glissez votre|placeholder="Mot de passe"|Paiement CB|'Carte utilisee: (entreprise|perso)'/],
+  ['plus de mojibake dans le HTML final', /\u00e2\u20ac|\u00c3[\u00a0-\u00bf\u2014]/],
   ['plus d annee 2026 en dur', /\{v:'2026-\d\d'|'Year 2026'|year 2026|'2026-03'|\/2026\//],
 ];
 

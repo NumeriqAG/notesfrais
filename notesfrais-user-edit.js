@@ -114,7 +114,7 @@ function UserEditExpenseModal({expense,onClose,onSaved,setViewer}){
         uploaded.push({path:out.path||out.url,name:out.name||file.name});
       }
       const nextReceipts=normalizeReceiptItems([...receiptItems,...uploaded]);
-      const cardNote=form.paymentCard==='entreprise'?'Carte utilisee: entreprise':'Carte utilisee: perso';
+      const cardNote=form.paymentCard==='entreprise'?'Payment card: company':'Payment card: personal';
       const mealNote=form.category==='repas'?'With: '+form.mealWith.trim():'';
       const updated=await updateUserExpense(expense.id,{
         date:form.date,
