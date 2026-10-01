@@ -156,10 +156,12 @@ const REQUIRED = {
     ['confirmation avant suppression : handlers', 'NOTESFRAIS_DELETE_CONFIRM_V1'],
     ['confirmation avant suppression : etat', 'const [pendingDelete,setPendingDelete]=useState(null);'],
     ['confirmation avant suppression : modale', 'data-nf-delete-confirm'],
+    ['annee calculee, plus figee sur 2026', 'NOTESFRAIS_YEAR_V1'],
+    ['retour possible sur une annee passee', 'function nfSwitchYear('],
     ['suppression jamais immediate', 'const deleteExpense=useCallback((id,receiptPath)=>{setPendingDelete'],
   ],
   test: [
-    ['12 mois disponibles', "{v:'2026-12'"],
+    ['12 mois de l annee active', 'const MONTHS=[\'January\','],
     ['selecteur de periode dans les onglets', 'function PeriodInsideTabs('],
     ['soumission du mois', 'submitCurrentMonth'],
     ['dashboard finance', 'function FinanceDashboardTab('],
@@ -167,7 +169,7 @@ const REQUIRED = {
     ['edition disponible en preprod', 'setEditingExpense'],
   ],
   mike: [
-    ['12 mois disponibles', "{v:'2026-12'"],
+    ['12 mois de l annee active', 'const MONTHS=[\'January\','],
     ['selecteur de periode dans les onglets', 'function PeriodInsideTabs('],
     ['soumission du mois', 'submitCurrentMonth'],
     ['dashboard finance', 'function FinanceDashboardTab('],
@@ -183,6 +185,7 @@ const REQUIRED = {
 const FORBIDDEN = [
   ['pas de code d acces en dur', /MIKE2026|FINANCE2026|ACCESS_CODES/],
   ['plus de client Supabase', /supabase\.createClient\(SUPABASE/],
+  ['plus d annee 2026 en dur', /\{v:'2026-\d\d'|'Year 2026'|year 2026|'2026-03'|\/2026\//],
 ];
 
 // Chaque canal doit enregistrer SON service worker sur SA portee : une portee

@@ -88,6 +88,11 @@ const page = await browser.newPage({
   deviceScaleFactor: 2, isMobile: true, hasTouch: true
 });
 
+// L'app ouvre le mois courant : sans horloge figee, les frais d'aout ne
+// s'affichent plus des septembre et tout le parcours echoue. L'horloge suit
+// son cours a partir de cette date ; la section 8 la deplace en 2027.
+await page.clock.install({ time: new Date(`${today}-20T10:00:00`) });
+
 const errors = [];
 page.on('pageerror', e => errors.push(String(e).split('\n')[0].slice(0, 200)));
 
@@ -101,7 +106,7 @@ await page.route('**/api/**', async route => {
   const method = req.method();
   let body = null;
   try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch (_) {}
-  calls.push({ method, path: url.pathname, body });
+  calls.push({ method, path: url.pathname, query: url.search, body });
   const json = payload => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
 
   if (url.pathname === '/api/session') {
@@ -127,8 +132,8 @@ await page.route('**/api/**', async route => {
       return json({ ok: true, data: null });
     }
     if (method === 'PATCH') return json({ ok: true, data: null });
-    const from = url.searchParams.get('from') || '';
-    return json({ ok: true, data: from.startsWith(today) ? rows : [] });
+    const from = (url.searchParams.get('from') || '').slice(0, 7);
+    return json({ ok: true, data: from ? rows.filter(r => String(r.date).startsWith(from)) : [] });
   }
   return json({ ok: true, data: [] });
 });
@@ -412,6 +417,52 @@ await page.waitForTimeout(4000);
 check('la soumission part vers l API',
   since(mark).some(c => c.path === '/api/monthly-submission'));
 await shot('08-soumis');
+
+// ── 8 · Changement d'annee ────────────────────────────────────────────
+// MONTHS etait la liste litterale des mois de 2026. Au 1er janvier 2027 l'app
+// devait suivre le calendrier ET laisser soumettre decembre 2026.
+console.log("\n8. Changement d'annee");
+rows.push(expense(900, 3, 'Hotel Bellevue', 210, 'hotel', 'pending', 'Payment card: company'));
+rows[rows.length - 1].date = '2026-12-18';
+await page.clock.setSystemTime(new Date('2027-01-12T10:00:00'));
+mark = calls.length;
+await page.reload({ waitUntil: 'load' });
+await page.waitForTimeout(6000);
+const monthSelect = page.locator('[data-period-selector] select').first();
+check('janvier 2027 s ouvre par defaut', await monthSelect.inputValue() === '2027-01',
+  await monthSelect.inputValue());
+const loaded = since(mark).filter(c => c.method === 'GET' && c.path === '/api/expenses').map(c => c.query);
+check('les 12 mois de 2027 sont charges',
+  loaded.length === 12 && loaded.every(q => q.includes('from=2027-')), loaded.slice(0, 2).join(' '));
+check('2026 reste proposee', await monthSelect.locator('option[value="nfyear:2026"]').count() === 1);
+check('aucun mois de 2026 n est melange a 2027',
+  await monthSelect.locator('option[value^="2026-"]').count() === 0);
+
+mark = calls.length;
+await Promise.all([
+  page.waitForEvent('load'),
+  monthSelect.selectOption('nfyear:2026')
+]);
+await page.waitForTimeout(6000);
+check('revenir sur 2026 ouvre decembre', await page.locator('[data-period-selector] select').first().inputValue() === '2026-12');
+check('le frais de decembre est liste', await page.locator('.nf-ios-expense-row').count() === 1,
+  `${await page.locator('.nf-ios-expense-row').count()} ligne(s)`);
+check('les mois de 2026 sont recharges',
+  since(mark).some(c => c.method === 'GET' && c.path === '/api/expenses' && c.query.includes('from=2026-12')));
+check('2027 reste atteignable', await page.locator('[data-period-selector] select option[value="nfyear:2027"]').count() === 1);
+await shot('09-decembre-2026');
+
+await page.locator('[data-period-selector] button:has-text("Full year")').first().click({ force: true });
+await page.waitForTimeout(800);
+const yearPicker = page.locator('[data-nf-year-picker]').first();
+check('le mode annee propose les annees', await yearPicker.count() === 1);
+if (await yearPicker.count()) {
+  check('il affiche l annee active', await yearPicker.inputValue() === 'nfyear:2026');
+  await Promise.all([page.waitForEvent('load'), yearPicker.selectOption('nfyear:2027')]);
+  await page.waitForTimeout(6000);
+  check('on reste en mode annee apres le changement',
+    await page.locator('[data-nf-year-picker]').first().inputValue().catch(() => '') === 'nfyear:2027');
+}
 
 // ── Bilan ─────────────────────────────────────────────────────────────
 const real = errors.filter(e => !e.includes('ServiceWorkerRegistration'));

@@ -158,9 +158,18 @@ node tools/e2e-mobile.mjs test
 Les deux outils ci-dessus valident la **syntaxe** du HTML produit ; celui-ci
 valide le **comportement**. Il ouvre l'app dans Chromium avec `/api/*` simulé,
 puis **clique** : capture d'un frais, enchaînement « Save and add another »,
-import d'un CSV UBS, suppression avec confirmation, soumission du mois. 51
-assertions par canal, plus un journal des appels API qui prouve qu'un clic a
-bien agi.
+import d'un CSV UBS, suppression avec confirmation, soumission du mois,
+passage en janvier 2027 et retour sur décembre 2026. 67 assertions par canal,
+plus un journal des appels API qui prouve qu'un clic a bien agi.
+
+**L'horloge du navigateur est fixée** (`page.clock.install`) au 20 août 2026,
+le mois des données simulées : l'app ouvre le mois courant, et sans ça le
+parcours entier échouait dès septembre. La section 8 l'avance en 2027.
+
+Playwright n'est pas une dépendance du dépôt. Dans un conteneur neuf, le lier
+depuis l'installation globale (`ln -s $(npm root -g)/playwright node_modules/`)
+et déposer React, ReactDOM et Babel dans `.patch-out/vendor/` (`react.js`,
+`react-dom.js`, `babel.js`).
 
 Il existe parce que la compilation JSX ne voit pas la **portée**. Un
 identifiant hors portée compile parfaitement et n'explose qu'au clic : c'est
@@ -301,6 +310,9 @@ l'époque Supabase et continuent de tourner grâce au shim.
 | 38 | `ios-ui.js` | Ajustements iOS. |
 | 39 | `user-edit.js` | **Édition d'un frais**, boutons Edit/Delete, état « Closed » sur un mois soumis. |
 | 40 | `delete-confirm.js` | Confirmation avant suppression. `deleteExpense` n'efface plus : il ouvre la modale, donc **tous les appelants sont couverts, présents et futurs**. Chargé après les traductions, il porte ses deux langues lui-même. |
+| 41 | `locale.js` | Dates formatées en `en-GB` au lieu de `fr-CH` en dur. |
+| 42 | `mobile-redesign.js` | Refonte mobile (feuille de capture, récapitulatif du mois, diagnostic OCR, `NOTESFRAIS_BUILD`). |
+| 43 | `year.js` | **Année active** : `MONTHS` = les 12 mois de l'année en cours, ou d'une année passée choisie dans les sélecteurs (« Other years », ou le sélecteur du mode « Full year »). Le choix recharge la page et vit en `sessionStorage`. Chargé en dernier, en anglais. |
 
 ---
 
@@ -496,10 +508,14 @@ Conséquences mesurées :
 - **La croix de la modale d'ajout efface le brouillon** au lieu de le garder ;
   seul « Garder en brouillon » préserve la saisie.
 
-### B. Tout est câblé sur 2026
-`MONTHS` est une liste littérale des douze mois de 2026, `StatsTab` affiche
-« Annee 2026 », `getDefaultNotesFraisMonth()` retombe sur `2026-03`. **Au
-1er janvier 2027 l'app se fige sur mars 2026.** À rendre glissant.
+### B. ~~Tout est câblé sur 2026~~ — corrigé par `year.js`
+`MONTHS` était une liste littérale des douze mois de 2026 et le mois par défaut
+retombait sur `2026-03` : au 1er janvier 2027 l'app se serait figée sur mars
+2026. `notesfrais-year.js` calcule désormais l'année active ; `test-patches.js`
+interdit le retour d'une année 2026 en dur dans le HTML généré, et
+`e2e-mobile.mjs` rejoue le passage en 2027. Seule `NOTESFRAIS_FIRST_YEAR=2026`
+reste, la première année proposée. Les patches antérieurs ciblent toujours les
+chaînes 2026 de `app.html` : c'est voulu, `year.js` les réécrit en sortie.
 
 ### C. Boucles `setInterval` permanentes
 `sticky-nav` et `modal-fix` toutes les 150 ms, `history-annual` 500 ms,
