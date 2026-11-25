@@ -162,7 +162,7 @@ valide le **comportement**. Il ouvre l'app dans Chromium avec `/api/*` simulé,
 puis **clique** : capture d'un frais, enchaînement « Save and add another »,
 import d'un CSV UBS, suppression avec confirmation, soumission du mois,
 modification d'un frais, passage en janvier 2027 et retour sur décembre 2026.
-101 assertions par canal, dont les commentaires (section 6b), la décision de la finance (section 9) et ce que Mike en voit (section 10),
+109 assertions par canal, dont les commentaires (section 6b), la décision de la finance (section 9) et ce que Mike en voit (section 10),
 plus un journal des appels API qui prouve qu'un clic a bien agi.
 
 **L'horloge du navigateur est fixée** (`page.clock.install`) au 20 août 2026,
@@ -333,6 +333,8 @@ l'époque Supabase et continuent de tourner grâce au shim.
 | 45 | `expense-comments.js` | **Commentaires sur un frais** : bouton 💬 et pastilles « To fix » / 💬 n sur la carte employé et dans le tableau finance, fil en feuille plein écran, case « Mark as To fix » et « Mark as resolved » côté finance, bouton « Fix » sur un frais à corriger d'un mois clos. Chargé en dernier, en anglais. |
 | 46 | `month-review.js` | **Circuit de validation au niveau du mois** (choix de Thomas, nov. 2026 : pas de statut frais par frais). Bloc « Decision for … » dans la revue finance (Approve / Send back avec motif obligatoire / Mark reimbursed / Undo), pastille sur le dashboard, bandeau et pastille côté utilisateur. Chargé après `english-final`, en anglais ; chaque cible manquante **lève une erreur** au lieu d'un no-op. |
 | 47 | `brand.js` | **Identité Numeriq Payroll** (nov. 2026, validée sur maquette) : palette tirée du logo (ardoise #2E3E4F, bleu #0F5E92, fond #F3F6F9), logo sur la connexion et dans l'espace finance, icônes d'écran d'accueil PNG, montants au format suisse (`fmt` : CHF 2'961.80), vignette qui ne masque plus la date, actions de ligne et barre du bas (reçu, barres, banque) en icônes au trait, un seul bouton d'ajout, soumission discrète tant qu'il manque un justificatif, diagnostic OCR replié sous « Technical details ». Chargé en dernier ; chaque cible manquante lève une erreur. `test-patches.js` interdit le retour de l'ancien bleu roi #1A3FB5. |
+| 48 | `mike-home.js` | **Accueil de Mike, suite de la maquette** (nov. 2026) : frais **groupés par jour** (« Today », « Tuesday 18 Aug »), une ligne ouvre la **fiche du frais** (`NfExpenseDetail`, portée sur `<body>` : photo, détails, état UBS, fil de la finance, Edit / Fix / Delete), et la cellule « UBS statement » de la carte du mois **lance l'import UBS**. Sur mobile, Edit, Delete et 💬 ne sont plus sur la ligne mais dans la fiche. Chaque cible manquante lève une erreur. |
+| 49 | `dark.js` | **Mode sombre de l'iPhone**, interface de Mike seulement (`body.nf-ios-mike`) et connexion ; la finance reste claire. Il relit les règles CSS mobiles déjà injectées et en émet une copie sombre d'après une table de couleurs, puis rattrape les styles inline de React par sélecteurs d'attribut (`[style*="background: rgb(255, 255, 255)"]`). **Une nouvelle couleur claire en dur dans un patch mobile doit être ajoutée à la table**, sinon elle reste claire en mode sombre. Ses `replace()` passent par un garde (`R`) : ne rien trouver y est normal. |
 
 ---
 

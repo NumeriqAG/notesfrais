@@ -207,6 +207,8 @@ const check = (label, ok, detail = '') => {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}${detail && !ok ? ' — ' + detail : ''}`);
   ok ? pass++ : fail++;
 };
+// Ouvre la fiche d'un frais comme le doigt : un clic sur la ligne, hors boutons.
+const openDetail = async row => { await row.evaluate(el => el.click()); await page.waitForTimeout(700); };
 const shot = name => page.screenshot({ path: `${OUT}/${channel}-${name}.png` });
 const since = n => calls.slice(n);
 
@@ -409,6 +411,20 @@ check('la modale UBS est fermee',
   await page.locator('button').filter({ hasText: /Import(er)? \d+/ }).count() === 0);
 await shot('05-apres-ubs');
 
+// Le releve se lance aussi depuis la carte du mois, sans passer par l'onglet.
+await page.locator('#test-bottom-nav button:has-text("Expenses")').first().click({ force: true });
+await page.waitForTimeout(1200);
+const ubsCell = page.locator('[data-nf-ubs-open]');
+check('la carte du mois resume le rapprochement UBS',
+  /\d+ of \d+ matched/.test(await ubsCell.innerText().catch(() => '')),
+  await ubsCell.innerText().catch(() => 'cellule absente'));
+await ubsCell.click({ force: true });
+await page.waitForTimeout(900);
+check('elle ouvre l import UBS', await page.locator('text=Drop your UBS CSV here').count() >= 1);
+await page.keyboard.press('Escape');
+await page.locator('button').filter({ hasText: /^(Cancel|Close|×|✕)$/ }).first().click({ force: true, timeout: 1500 }).catch(() => {});
+await page.waitForTimeout(600);
+
 // ── 6a · Modification ─────────────────────────────────────────────────
 // L'edition ecrivait « Carte utilisee: entreprise » quand tout le reste lit
 // « Payment card: company » : un frais modifie perdait son badge de carte.
@@ -421,9 +437,19 @@ check('une note deja en base garde son badge de carte',
   (await ibis.innerText().catch(() => 'ligne absente')).replace(/\s+/g, ' ').slice(0, 120));
 check('elle n affiche pas la mention brute',
   !/Carte utilisee/.test(await ibis.innerText().catch(() => '')));
+// Une ligne ouvre la fiche du frais ; Edit et Delete y vivent desormais.
+check('la liste est groupee par jour', await page.locator('.nfm-daylist .nfm-day').count() >= 3,
+  String(await page.locator('.nfm-daylist .nfm-day').count()));
+await openDetail(ibis);
+const detail = page.locator('[data-nf-detail]');
+check('une ligne ouvre la fiche du frais', await detail.count() === 1);
+check('la fiche montre la carte et la TVA',
+  /Personal card/.test(await detail.innerText().catch(() => '')) && /VAT/.test(await detail.innerText().catch(() => '')));
+await shot('06a-fiche');
 mark = calls.length;
-await ibis.locator('.nf-ios-expense-actions button[title="Edit"]').first().click({ force: true });
+await detail.locator('[data-nf-act="edit"]').click({ force: true });
 await page.waitForTimeout(1200);
+check('Edit referme la fiche', await page.locator('[data-nf-detail]').count() === 0);
 const saveEdit = page.locator('button:has-text("Save changes")').first();
 check('la fiche de modification s ouvre', await saveEdit.count() === 1);
 if (await saveEdit.count()) {
@@ -446,7 +472,8 @@ check('le nombre de commentaires est affiche',
 check('une carte sans commentaire n a pas de badge',
   await page.locator('.nf-ios-expense-row').filter({ hasText: 'SBB' }).locator('.nf-review-chips').count() === 0);
 await shot('06b-carte-a-corriger');
-await ibisRow.locator('[data-nf-comments-open]').click({ force: true });
+await openDetail(ibisRow);
+await page.locator('[data-nf-detail] [data-nf-comments-open]').click({ force: true });
 await page.waitForTimeout(800);
 const thread = page.locator('[data-nf-comments-sheet]');
 check('le fil s ouvre', await thread.count() === 1);
@@ -467,6 +494,9 @@ check('elle apparait dans le fil', await page.locator('[data-nf-comment]').count
 await shot('06b-fil');
 await page.locator('[data-nf-comments-sheet] button[aria-label="Close comments"]').click({ force: true });
 await page.waitForTimeout(600);
+check('fermer le fil ramene a la fiche', await page.locator('[data-nf-detail]').count() === 1);
+await page.locator('[data-nf-detail-close]').click({ force: true });
+await page.waitForTimeout(500);
 check('le compteur passe a 2',
   /2/.test(await ibisRow.locator('[data-nf-comment-count]').innerText().catch(() => '')));
 
@@ -475,7 +505,8 @@ console.log('\n6. Suppression');
 await page.locator('#test-bottom-nav button:has-text("Expenses")').first().click({ force: true });
 await page.waitForTimeout(1500);
 mark = calls.length;
-await page.locator('.nf-ios-expense-actions button[title="Delete"]').last().click({ force: true });
+await openDetail(page.locator('.nf-ios-expense-row').last());
+await page.locator('[data-nf-detail] [data-nf-act="delete"]').click({ force: true });
 await page.waitForTimeout(900);
 const del = page.locator('[data-nf-delete-confirm]');
 check('la confirmation s ouvre', await del.count() === 1);
@@ -501,7 +532,8 @@ check('« garder » referme sans supprimer',
   since(mark).every(c => c.method !== 'DELETE'));
 
 const before = await page.locator('.nf-ios-expense-row').count();
-await page.locator('.nf-ios-expense-actions button[title="Delete"]').last().click({ force: true });
+await openDetail(page.locator('.nf-ios-expense-row').last());
+await page.locator('[data-nf-detail] [data-nf-act="delete"]').click({ force: true });
 await page.waitForTimeout(900);
 mark = calls.length;
 await page.locator('.nfm-del-go').click({ force: true });
