@@ -42,3 +42,18 @@ create table if not exists app_profiles (
   constraint app_profiles_role_check check (role in ('user', 'finance')),
   constraint app_profiles_channel_check check (app_channel in ('mike', 'test', 'all'))
 );
+
+-- Decision de la finance sur un mois soumis (cree aussi a la demande par
+-- api/_lib/month-review.js). Absence de ligne = soumis, en attente de controle.
+create table if not exists month_reviews (
+  app_channel text not null,
+  month text not null,
+  status text not null,
+  note text not null default '',
+  decided_at timestamptz not null default now(),
+  decided_by text not null default '',
+  primary key (app_channel, month),
+  constraint month_reviews_status_check check (status in ('approved', 'sent_back', 'reimbursed')),
+  constraint month_reviews_channel_check check (app_channel in ('mike', 'test')),
+  constraint month_reviews_month_check check (month ~ '^[0-9]{4}-[0-9]{2}$')
+);

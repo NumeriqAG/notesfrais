@@ -4,6 +4,7 @@ const { sendJson, readJson, methodNotAllowed } = require('./_lib/http');
 const { requireSession } = require('./_lib/auth');
 const { sql, ensureSchema, normalizeReceiptItems } = require('./_lib/db');
 const { getObject } = require('./_lib/r2');
+const { clearSentBack } = require('./_lib/month-review');
 
 let gmailTransport;
 
@@ -68,6 +69,16 @@ module.exports = async function handler(req, res) {
           and app_channel = ${session.app_channel}
         returning *`;
 
+    // Un mois renvoye par la finance puis soumis a nouveau redevient « en
+    // attente de controle ». Un echec ici ne doit pas annuler une soumission
+    // deja envoyee par email.
+    let reviewReset = true;
+    try {
+      await clearSentBack(session.app_channel, month);
+    } catch (_error) {
+      reviewReset = false;
+    }
+
     return sendJson(res, 200, {
       ok: true,
       month,
@@ -78,6 +89,7 @@ module.exports = async function handler(req, res) {
       totalCHF,
       to: recipient,
       mail,
+      reviewReset,
       resent: alreadySubmitted,
       data: updated
     });
