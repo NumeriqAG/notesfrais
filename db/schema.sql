@@ -53,4 +53,14 @@ create table if not exists month_reviews (
   constraint month_reviews_status_check check (status in ('approved', 'sent_back', 'reimbursed')),
   constraint month_reviews_channel_check check (app_channel in ('mike', 'test')),
   constraint month_reviews_month_check check (month ~ '^[0-9]{4}-[0-9]{2}$')
+-- Abonnements Web Push de la PWA (iOS 16.4+, ecran d'accueil).
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  p256dh text not null,
+  auth text not null,
+  app_channel text not null,
+  email text not null default '',
+  user_agent text not null default '',
+  created_at timestamptz not null default now(),
+  last_success_at timestamptz
 );

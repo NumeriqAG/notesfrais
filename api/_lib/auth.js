@@ -226,6 +226,7 @@ module.exports = {
   clearCookie,
   serializeCookie,
   authenticate,
+  profilesFromEnv,
   checkLoginRateLimit,
   recordLoginFailure,
   clearLoginFailures

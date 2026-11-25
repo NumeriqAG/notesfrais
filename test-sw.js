@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notesfrais-test-shell-v14';
+const CACHE_NAME = 'notesfrais-test-shell-v15';
 
 const SHELL_FILES = [
   '/test',
@@ -50,7 +50,8 @@ const SHELL_FILES = [
   '/notesfrais-mobile-redesign.js',
   '/notesfrais-year.js',
   '/notesfrais-english-final.js',
-  '/notesfrais-month-review.js'
+  '/notesfrais-month-review.js',
+  '/notesfrais-push-optin.js'
 ];
 
 const EXTERNAL_FILES = [
@@ -114,4 +115,31 @@ self.addEventListener('fetch', event => {
       return response;
     }).catch(() => caches.match(request).then(cached => cached || fallbackFor(url)))
   );
+});
+
+// Web Push : la finance a approuve, renvoye, rembourse ou commente.
+// Sur iOS, un push qui n'affiche rien fait revoquer l'abonnement par Safari :
+// on affiche donc TOUJOURS une notification, meme sans charge utile.
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (_) { data = { body: event.data ? event.data.text() : '' }; }
+  const title = data.title || 'NotesFrais';
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || 'Finance replied about your expenses.',
+    icon: '/icon.svg',
+    badge: '/icon.svg',
+    tag: data.tag || 'notesfrais-finance',
+    data: { url: data.url || '/test' }
+  }));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/test';
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const client of list) {
+      if (new URL(client.url).pathname.startsWith('/test') && 'focus' in client) return client.focus();
+    }
+    return self.clients.openWindow(target);
+  }));
 });

@@ -165,6 +165,8 @@ const REQUIRED = {
     ['plus de francais dans l UI anglaise', 'NOTESFRAIS_ENGLISH_FINAL_V1'],
     ['une modification garde le badge de carte', "?'Payment card: company':'Payment card: personal'"],
     ['suppression jamais immediate', 'const deleteExpense=useCallback((id,receiptPath)=>{setPendingDelete'],
+    ['notifications push : proposition', 'function NfdPushOptIn('],
+    ['notifications push : placee dans l onglet Expenses', '<NfdPushOptIn/>'],
   ],
   test: [
     ['12 mois de l annee active', 'const MONTHS=[\'January\','],
