@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { sendJson, readJson, methodNotAllowed } = require('./_lib/http');
 const { requireSession } = require('./_lib/auth');
 const { sql, ensureSchema } = require('./_lib/db');
+const { notifyExpenseComment } = require('./_lib/notify');
 
 // Fil de commentaires entre la finance et l'employe sur un frais, et statut de
 // controle « a corriger ».
@@ -85,5 +86,22 @@ async function addComment(req, res, session) {
       review_status = case when ${Boolean(reviewStatus)} then ${reviewStatus}::text else review_status end
     where id = ${id}
     returning id, comments, review_status`;
-  return sendJson(res, 200, { ok: true, data: row });
+
+  // Commentaire ou statut pose par la finance : prevenir l'utilisateur du
+  // canal (email puis Web Push). notifyExpenseComment n'echoue jamais ; le
+  // commentaire est deja enregistre.
+  let notification;
+  if (session.role === 'finance') {
+    const statusChanged = entries.some(entry => entry.kind === 'status');
+    const [expense] = await db`select id, app_channel, merchant, amount, amount_chf, date from expenses where id = ${id}`;
+    if (expense) {
+      notification = await notifyExpenseComment({
+        channel: expense.app_channel,
+        expense,
+        comment: text,
+        reviewStatus: statusChanged ? reviewStatus : null
+      }).catch(error => ({ email: { ok: false, error: error.message || String(error) }, push: { ok: false } }));
+    }
+  }
+  return sendJson(res, 200, { ok: true, data: row, ...(notification ? { notification } : {}) });
 }
