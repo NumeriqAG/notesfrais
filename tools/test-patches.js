@@ -178,6 +178,8 @@ const REQUIRED = {
     ['identite : icone d ecran d accueil', '/apple-touch-icon.png'],
     ['lecture ratee : diagnostic replie, pas retire', 'nfm-ocr-details'],
     ['montants au format suisse', '(?=(\\d{3})+(?!\\d))'],
+    ['notifications push : proposition', 'function NfdPushOptIn('],
+    ['notifications push : placee dans l onglet Expenses', '<NfdPushOptIn/>'],
   ],
   test: [
     ['12 mois de l annee active', 'const MONTHS=[\'January\','],

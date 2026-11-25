@@ -73,6 +73,7 @@ base côté client. Le front parle à des routes serverless :
 | `POST /api/monthly-submission` | Clôture le mois + email à la finance **avec les justificatifs en ZIP**. |
 | `POST /api/expense-comments` | Commentaire sur un frais, et statut « à corriger » (`review_status`, finance seulement). |
 | `GET/POST /api/month-review` | **Décision de la finance sur un mois soumis** : approuver, renvoyer (rouvre le mois), marquer remboursé, annuler. Finance seule en écriture ; un `user` ne lit que son canal. Table `month_reviews`. |
+| `GET/POST/DELETE /api/push-subscription` | Clé VAPID publique, abonnement Web Push de l'iPhone (compte `user` seulement, canal forcé depuis la session). |
 | `POST /api/notify-submission` | Email de notification simple. Probablement supplanté par la route ci-dessus — à vérifier avant de s'en servir. |
 
 ### Les deux canaux
@@ -333,6 +334,7 @@ l'époque Supabase et continuent de tourner grâce au shim.
 | 45 | `expense-comments.js` | **Commentaires sur un frais** : bouton 💬 et pastilles « To fix » / 💬 n sur la carte employé et dans le tableau finance, fil en feuille plein écran, case « Mark as To fix » et « Mark as resolved » côté finance, bouton « Fix » sur un frais à corriger d'un mois clos. Chargé en dernier, en anglais. |
 | 46 | `month-review.js` | **Circuit de validation au niveau du mois** (choix de Thomas, nov. 2026 : pas de statut frais par frais). Bloc « Decision for … » dans la revue finance (Approve / Send back avec motif obligatoire / Mark reimbursed / Undo), pastille sur le dashboard, bandeau et pastille côté utilisateur. Chargé après `english-final`, en anglais ; chaque cible manquante **lève une erreur** au lieu d'un no-op. |
 | 47 | `brand.js` | **Identité Numeriq Payroll** (nov. 2026, validée sur maquette) : palette tirée du logo (ardoise #2E3E4F, bleu #0F5E92, fond #F3F6F9), logo sur la connexion et dans l'espace finance, icônes d'écran d'accueil PNG, montants au format suisse (`fmt` : CHF 2'961.80), vignette qui ne masque plus la date, actions de ligne et barre du bas (reçu, barres, banque) en icônes au trait, un seul bouton d'ajout, soumission discrète tant qu'il manque un justificatif, diagnostic OCR replié sous « Technical details ». Chargé en dernier ; chaque cible manquante lève une erreur. `test-patches.js` interdit le retour de l'ancien bleu roi #1A3FB5. |
+| 48 | `push-optin.js` | Propose à l'utilisateur d'activer les notifications push (onglet Expenses). Dans Safari sur iPhone, explique d'abord l'ajout à l'écran d'accueil : le Web Push iOS (16.4+) n'existe que dans la PWA installée. Chargé en dernier, en anglais. |
 
 ---
 
@@ -482,6 +484,18 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
   destinataire configuré, la soumission échoue entièrement.
 - **Supprimer un frais efface aussi ses justificatifs de R2.** Sans ça ils
   deviennent inatteignables, l'accès exigeant une ligne en base qui les référence.
+- **Notifications à l'utilisateur.** `api/_lib/notify.js` prévient l'utilisateur
+  d'un canal quand la finance agit : **email d'abord** (même transport Gmail SMTP /
+  Resend que le reste), **puis Web Push** vers chaque iPhone abonné
+  (`push_subscriptions`, clés VAPID). Points d'entrée : `notifyUser`,
+  `notifyMonthReview` (approve / send_back / reimburse) et `notifyExpenseComment`.
+  **Ils n'échouent jamais** : une notification ratée ne doit pas annuler la
+  décision qui l'a déclenchée ; le résultat de chaque canal est rendu à
+  l'appelant. Destinataire : `USER_NOTIFICATION_EMAIL`
+  (`USER_NOTIFICATION_TEST_EMAIL` en préprod, objet préfixé `[PREPROD - ignorer]`),
+  sinon l'email du compte `user` du canal. Les SW affichent **toujours** une
+  notification sur `push` : sur iOS, un push silencieux fait révoquer
+  l'abonnement.
 - **Copie des reçus par email.** À chaque frais créé avec justificatif, un email
   part vers `RECEIPT_BACKUP_EMAIL` (défaut : l'email de la session).
 - **Offline.** IndexedDB `notesfrais-offline-v1`, fichier sérialisé en data-URL
@@ -498,7 +512,10 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
 `R2_SECRET_ACCESS_KEY` · `R2_BUCKET` · `RESEND_API_KEY` ·
 `FINANCE_NOTIFICATION_EMAIL` · `MONTHLY_SUBMISSION_EMAIL` ·
 `MONTHLY_SUBMISSION_TEST_EMAIL` · `RECEIPT_BACKUP_EMAIL` · `RECEIPT_MAIL_FROM` ·
-`SUBMISSION_MAIL_FROM`. Modèle complet dans `.env.example`.
+`SUBMISSION_MAIL_FROM` · `USER_NOTIFICATION_EMAIL` · `USER_NOTIFICATION_TEST_EMAIL` ·
+`USER_NOTIFICATION_FROM` · `APP_BASE_URL` · `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` ·
+`VAPID_SUBJECT` (paire générée par `node scripts/generate-vapid-keys.mjs`). Modèle
+complet dans `.env.example`.
 
 ---
 

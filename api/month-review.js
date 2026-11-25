@@ -2,6 +2,7 @@ const { sendJson, readJson, methodNotAllowed, getQuery } = require('./_lib/http'
 const { requireSession } = require('./_lib/auth');
 const { sql, ensureSchema, sanitizeChannel } = require('./_lib/db');
 const { ensureMonthReviewTable } = require('./_lib/month-review');
+const { notifyMonthReview } = require('./_lib/notify');
 
 // Circuit de validation au niveau du MOIS (choix de Thomas, nov. 2026) :
 // la finance approuve, renvoie (ce qui rouvre le mois) ou marque rembourse.
@@ -132,8 +133,19 @@ function publicRow(row) {
   };
 }
 
-function done(res, payload) {
-  return sendJson(res, 200, { ok: true, ...payload });
+// Toute decision reussie passe ici : on previent l'utilisateur du canal
+// (email puis Web Push). notifyMonthReview n'echoue jamais ; 'undo' ne
+// notifie rien. La decision est deja enregistree a ce stade.
+async function done(res, payload) {
+  const review = payload.review || {};
+  const notification = await notifyMonthReview({
+    channel: payload.channel,
+    month: payload.month,
+    action: payload.action,
+    note: review.note || '',
+    reviewId: review.decided_at || null
+  }).catch(error => ({ email: { ok: false, error: error.message || String(error) }, push: { ok: false } }));
+  return sendJson(res, 200, { ok: true, ...payload, notification });
 }
 
 function conflict(res, error) {
