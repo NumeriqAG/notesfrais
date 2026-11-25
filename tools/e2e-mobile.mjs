@@ -105,7 +105,6 @@ const server = createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const BASE = `http://127.0.0.1:${server.address().port}`;
 
-// Chemin historique du conteneur ; ailleurs, Playwright trouve son navigateur.
 const browser = await chromium.launch({
   // Le chemin depend de l'image du conteneur : on prend le premier qui existe.
   executablePath: ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium']

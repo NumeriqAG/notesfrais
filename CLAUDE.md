@@ -163,7 +163,7 @@ valide le **comportement**. Il ouvre l'app dans Chromium avec `/api/*` simulé,
 puis **clique** : capture d'un frais, enchaînement « Save and add another »,
 import d'un CSV UBS, suppression avec confirmation, soumission du mois,
 modification d'un frais, passage en janvier 2027 et retour sur décembre 2026.
-89 assertions par canal, dont la décision de la finance (section 9) et ce que Mike en voit (section 10),
+101 assertions par canal, dont les commentaires (section 6b), la décision de la finance (section 9) et ce que Mike en voit (section 10),
 plus un journal des appels API qui prouve qu'un clic a bien agi.
 
 **L'horloge du navigateur est fixée** (`page.clock.install`) au 20 août 2026,
