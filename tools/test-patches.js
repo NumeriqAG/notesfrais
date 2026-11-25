@@ -173,6 +173,7 @@ const REQUIRED = {
     ['commentaires : pastilles cote finance', "<NfReviewChips expense={e}/>{rowIssues.length===0&&e.reviewStatus!=='to_fix'"],
     ['commentaires : bouton cote finance', '<NfCommentsButton expense={e} onUpdated={saveEdited}/>'],
     ['identite Numeriq Payroll : feuille de style', 'NOTESFRAIS_BRAND_V1'],
+    ['icones au trait de la barre du bas', 'nf-tab-icons'],
     ['identite : logo sur la connexion', '/logo-numeriq-mark.png'],
     ['identite : icone d ecran d accueil', '/apple-touch-icon.png'],
     ['lecture ratee : diagnostic replie, pas retire', 'nfm-ocr-details'],
