@@ -165,6 +165,13 @@ const REQUIRED = {
     ['plus de francais dans l UI anglaise', 'NOTESFRAIS_ENGLISH_FINAL_V1'],
     ['une modification garde le badge de carte', "?'Payment card: company':'Payment card: personal'"],
     ['suppression jamais immediate', 'const deleteExpense=useCallback((id,receiptPath)=>{setPendingDelete'],
+    ['commentaires : route API', '/api/expense-comments'],
+    ['commentaires : lus depuis les lignes', "reviewStatus:r.review_status||'ok'"],
+    ['commentaires : pastilles sur la carte employe', '<div className="nf-review-wrap" style={{marginTop:5}}><NfReviewChips expense={e}/></div>'],
+    ['commentaires : bouton sur la carte employe', '<NfCommentsButton expense={e} compact={isMobile}'],
+    ['commentaires : correction rouverte sur un mois clos', 'data-nf-fix-edit'],
+    ['commentaires : pastilles cote finance', "<NfReviewChips expense={e}/>{rowIssues.length===0&&e.reviewStatus!=='to_fix'"],
+    ['commentaires : bouton cote finance', '<NfCommentsButton expense={e} onUpdated={saveEdited}/>'],
   ],
   test: [
     ['12 mois de l annee active', 'const MONTHS=[\'January\','],
