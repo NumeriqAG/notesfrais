@@ -41,6 +41,11 @@ html = html
 // carte « Company card » afficherait un placeholder plus haut que le vrai logo.
 const logo = readFileSync('logo-numeriq-payroll.png').toString('base64');
 html = html.replace(/\/logo-numeriq-payroll\.png/g, `data:image/png;base64,${logo}`);
+// Idem pour le logo Numeriq Payroll (connexion, espace finance).
+for (const file of ['logo-numeriq-mark.png', 'logo-numeriq-payroll-full.png']) {
+  const b64 = readFileSync(file).toString('base64');
+  html = html.split('/' + file).join(`data:image/png;base64,${b64}`);
+}
 // Ce conteneur n'a que DejaVu Sans : `-apple-system` n'y resout rien et les
 // captures montrent une police bien plus large et lourde que ce qu'affichera
 // l'iPhone. On declare Inter — metriquement proche de SF Pro — sous le nom
@@ -280,8 +285,17 @@ const ocrLabel = await page.locator('.nfm-ocr-l').innerText();
 check('l etat de lecture est annonce', ocrLabel.length > 0, ocrLabel);
 check('l echec d OCR est annonce', /Could not read/i.test(ocrLabel), ocrLabel);
 await page.waitForTimeout(9000);
+// Mike lit d'abord une phrase simple ; le diagnostic est replie dessous,
+// toujours dans la page. On photographie l'etat replie, puis on l'ouvre.
+const amberShort = await page.locator('.nfm-note-amber').innerText();
+check('il rassure sur la photo', amberShort.includes('photo is kept'));
+check('le diagnostic est replie par defaut',
+  !/importScripts/.test(amberShort) && await page.locator('.nfm-ocr-details').count() === 1,
+  amberShort.replace(/\s+/g, ' ').slice(0, 160));
+await shot('01-capture');
+await page.locator('.nfm-ocr-details > summary').click({ force: true });
+await page.waitForTimeout(300);
 const amber = await page.locator('.nfm-note-amber').innerText();
-check('il rassure sur la photo', amber.includes('photo is kept'));
 // Sans la cause, la meme panne se represente et personne ne sait pourquoi.
 // L'etape est ce qui situe la panne quand l'erreur remontee est vide.
 check('il nomme l etape', /(loading Tesseract|preprocessing image|reading|extracting)/.test(amber),
@@ -296,7 +310,7 @@ check('il sonde le worker blob:', /blob worker (OK|BLOCKED)/.test(amber),
   amber.replace(/\s+/g, ' ').slice(0, 140));
 check('il donne le build', /build \d{4}-\d{2}-\d{2}/.test(amber),
   amber.replace(/\s+/g, ' ').slice(0, 140));
-await shot('01-capture');
+await shot('01b-capture-diagnostic');
 
 // ── 3 · Enregistrer ───────────────────────────────────────────────────
 console.log('\n3. Enregistrer un frais');
@@ -500,13 +514,16 @@ check('la ligne disparait de la liste',
 
 // ── 7 · Soumission ────────────────────────────────────────────────────
 console.log('\n7. Soumission du mois');
-// Le lien d'ajout manuel vit dans la meme carte que le bouton de soumission.
+// Un seul bouton d'ajout : « Scan receipt » ouvre la meme feuille, saisie
+// manuelle comprise. Le lien « + Add expense » reste dans le DOM (sticky-nav
+// le cherche par son texte) mais n'est plus affiche.
 const addLink = page.locator('.nfm-add-link');
-check('le lien « + Add expense » est present', await addLink.count() === 1);
-if (await addLink.count()) {
-  await addLink.click({ force: true });
+check('le lien « + Add expense » n est plus affiche en double',
+  await addLink.count() === 1 && !(await addLink.isVisible()));
+{
+  await openCapture();
   await page.waitForTimeout(1500);
-  check('il ouvre la feuille de capture', await page.locator('[data-nfm-capture]').count() === 1);
+  check('le bouton photo ouvre la feuille de capture', await page.locator('[data-nfm-capture]').count() === 1);
   await page.locator('.nfm-sheet-bar button:has-text("Cancel")').click({ force: true });
   await page.waitForTimeout(1200);
   const keep = page.locator('button:has-text("Keep as draft"), button:has-text("Discard")').first();
