@@ -67,3 +67,13 @@ create table if not exists push_subscriptions (
   created_at timestamptz not null default now(),
   last_success_at timestamptz
 );
+
+-- Journal anti-doublon du rappel de fin de mois (api/cron/monthly-reminder.js,
+-- cree aussi a la demande).
+create table if not exists reminder_log (
+  app_channel text not null,
+  month text not null,
+  kind text not null,
+  sent_at timestamptz not null default now(),
+  primary key (app_channel, month, kind)
+);
