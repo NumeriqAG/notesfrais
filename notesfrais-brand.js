@@ -96,6 +96,11 @@
     const icChat = stroke('<path d="M4 5h16v11H9l-5 4z"/>', '#0F5E92');
     const icNoPhoto = stroke('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><path d="M12 10.5v5M9.5 13h5"/>', '#6B7785');
     const icCamera = stroke('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', '#FFFFFF');
+    // Barre du bas : icones au trait en masque, colorees par background-color.
+    const mask = d => ICON('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>');
+    const tabExpenses = mask('<path d="M6 3.5h12v17l-2.4-1.6-2.4 1.6-2.4-1.6-2.4 1.6L6 20.5z"/><path d="M9 8.5h6M9 12h6M9 15.5h3.5"/>');
+    const tabStats = mask('<rect x="4" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="16" y="3.5" width="4" height="16.5" rx="1"/>');
+    const tabBank = mask('<path d="M3.5 9 12 4l8.5 5z"/><path d="M5.5 11.5v6M10 11.5v6M14 11.5v6M18.5 11.5v6M3.5 20h17"/>');
 
     const css = `<style id="notesfrais-brand-v1">
 /* NOTESFRAIS_BRAND_V1 : identite Numeriq Payroll */
@@ -174,6 +179,19 @@ input,select,textarea,button{font-family:inherit}
     box-shadow:0 8px 22px rgba(15,94,146,.32)!important;
   }
   html body.nf-ios-mike #test-bottom-nav{background:#F8FAFC!important}
+  /* nf-tab-icons : Expenses = recu, Stats = barres, UBS = banque. */
+  html body.nf-ios-mike #test-bottom-nav button{color:#6B7785!important}
+  html body.nf-ios-mike #test-bottom-nav button.active{color:#0F5E92!important;background:transparent!important}
+  html body.nf-ios-mike #test-bottom-nav button[data-tab="expenses"]:before,
+  html body.nf-ios-mike #test-bottom-nav button[data-tab="stats"]:before,
+  html body.nf-ios-mike #test-bottom-nav button[data-tab="recon"]:before{
+    content:""!important;display:block!important;width:26px!important;height:26px!important;margin:0 auto 1px!important;
+    background-color:#6B7785!important;-webkit-mask:var(--nf-tab) center/26px 26px no-repeat;mask:var(--nf-tab) center/26px 26px no-repeat;
+  }
+  html body.nf-ios-mike #test-bottom-nav button[data-tab="expenses"]{--nf-tab:${tabExpenses}}
+  html body.nf-ios-mike #test-bottom-nav button[data-tab="stats"]{--nf-tab:${tabStats}}
+  html body.nf-ios-mike #test-bottom-nav button[data-tab="recon"]{--nf-tab:${tabBank}}
+  html body.nf-ios-mike #test-bottom-nav button.active[data-tab]:before{background-color:#0F5E92!important}
   html body.nf-ios-mike #test-bottom-nav:before{background:linear-gradient(to bottom,rgba(248,250,252,0) 0,#F8FAFC 18px,#F8FAFC 100%)!important}
 
   /* Lecture ratee : le titre d'abord, le diagnostic replie. */
