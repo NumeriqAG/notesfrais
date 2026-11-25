@@ -102,16 +102,27 @@ async function updateExpenses(req, res, session) {
   if (Object.keys(updates).length === 0) return sendJson(res, 400, { ok: false, error: 'No allowed update fields' });
 
   const current = session.role === 'finance'
-    ? await sql()`select id, date, app_channel, submission_status, receipt_url, receipt_name, receipt_items from expenses where id = any(${ids})`
-    : await sql()`select id, date, app_channel, submission_status, receipt_url, receipt_name, receipt_items from expenses where id = any(${ids}) and app_channel = ${session.app_channel}`;
+    ? await sql()`select id, date, app_channel, submission_status, review_status, receipt_url, receipt_name, receipt_items from expenses where id = any(${ids})`
+    : await sql()`select id, date, app_channel, submission_status, review_status, receipt_url, receipt_name, receipt_items from expenses where id = any(${ids}) and app_channel = ${session.app_channel}`;
   if (current.length !== ids.length) return sendJson(res, 403, { ok: false, error: 'Expense not accessible' });
   if (session.role !== 'finance') {
     const updateKeys = Object.keys(updates);
     const submissionOnly = updateKeys.length > 0 && updateKeys.every(key => key === 'submission_status' || key === 'submitted_at');
-    if (!submissionOnly && current.some(row => row.submission_status === 'submitted')) {
+    // Un mois soumis est clos, sauf pour un frais que la finance a marque
+    // « a corriger » (api/expense-comments.js) : l'employe doit pouvoir le
+    // reprendre. Il reste dans son mois — le deplacer ailleurs le ferait
+    // sortir du lot deja envoye a la finance.
+    const lockedRows = current.filter(row => row.submission_status === 'submitted' && row.review_status !== 'to_fix');
+    if (!submissionOnly && lockedRows.length > 0) {
       return sendJson(res, 403, { ok: false, error: 'This month is closed and can no longer be changed' });
     }
-    if (!submissionOnly && updates.date && await isSubmittedMonth(session.app_channel, updates.date)) {
+    const movedOutOfClosedMonth = updates.date && current.some(row =>
+      row.submission_status === 'submitted' && monthOf(row.date) !== monthOf(updates.date));
+    if (!submissionOnly && movedOutOfClosedMonth) {
+      return sendJson(res, 403, { ok: false, error: 'An expense of a submitted month must stay in that month' });
+    }
+    const staysInOwnClosedMonth = current.every(row => row.submission_status === 'submitted');
+    if (!submissionOnly && updates.date && !staysInOwnClosedMonth && await isSubmittedMonth(session.app_channel, updates.date)) {
       return sendJson(res, 403, { ok: false, error: 'The destination month is closed' });
     }
   }
@@ -196,6 +207,11 @@ async function deleteExpense(req, res, session) {
     }
   }
   return sendJson(res, 200, { ok: true, data: rows[0], receiptCleanup });
+}
+
+function monthOf(value) {
+  if (value instanceof Date) return value.toISOString().slice(0, 7);
+  return String(value || '').slice(0, 7);
 }
 
 function lastDayOfMonth(month) {

@@ -75,13 +75,21 @@ const rows = [
   expense(3, 11, 'Ibis Budget Lausanne', 89, 'hotel', 'pending', 'Carte utilisee: perso'),
   expense(4, 14, 'Coop Supermarche', 43.6, 'repas', 'pending', 'Payment card: company')
 ];
+// La finance a pose une question sur l'hotel et l'a marque « a corriger ».
+rows[2].review_status = 'to_fix';
+rows[2].comments = [
+  { id: 'c1', at: `${today}-15T09:00:00.000Z`, role: 'finance', email: 'finance@numeriq.ch', kind: 'status', review_status: 'to_fix' },
+  { id: 'c2', at: `${today}-15T09:00:00.000Z`, role: 'finance', email: 'finance@numeriq.ch', kind: 'comment', body: 'Was this a client visit? Please add the client name in the note.' }
+];
 
 // Journal des appels API : c'est la preuve qu'un clic a bien agi.
 const calls = [];
 let nextId = 100;
 
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  // Le chemin depend de l'image du conteneur : on prend le premier qui existe.
+  executablePath: ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium']
+    .find(p => existsSync(p)),
   args: ['--no-sandbox']
 });
 const page = await browser.newPage({
@@ -115,6 +123,13 @@ await page.route('**/api/**', async route => {
                   profile: { role: 'user', app_channel: channel } });
   }
   if (url.pathname === '/api/receipts') return json({ ok: true, url: 'about:blank' });
+  if (url.pathname === '/api/expense-comments') {
+    const row = rows.find(r => r.id === Number(body && body.expense_id));
+    if (!row) return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'Expense not found' }) });
+    row.comments = [...(row.comments || []), { id: 'c' + (++nextId), at: new Date().toISOString(),
+      role: 'user', email: 'mike@numeriq.ch', kind: 'comment', body: body.body }];
+    return json({ ok: true, data: { id: row.id, comments: row.comments, review_status: row.review_status || 'ok' } });
+  }
   if (url.pathname === '/api/monthly-submission') {
     await new Promise(r => setTimeout(r, 2500));   // laisse voir les 3 etapes
     return json({ ok: true, submitted: rows.length });
@@ -351,7 +366,7 @@ check('une note deja en base garde son badge de carte',
 check('elle n affiche pas la mention brute',
   !/Carte utilisee/.test(await ibis.innerText().catch(() => '')));
 mark = calls.length;
-await ibis.locator('.nf-ios-expense-actions button').first().click({ force: true });
+await ibis.locator('.nf-ios-expense-actions button[title="Edit"]').first().click({ force: true });
 await page.waitForTimeout(1200);
 const saveEdit = page.locator('button:has-text("Save changes")').first();
 check('la fiche de modification s ouvre', await saveEdit.count() === 1);
@@ -364,12 +379,47 @@ if (await saveEdit.count()) {
   check('elle enregistre la carte au format lu partout', /Payment card: personal/.test(note), note.slice(0, 120));
 }
 
+// ── 6b · Commentaires de la finance ───────────────────────────────────
+console.log('\n6b. Commentaires');
+await page.locator('#test-bottom-nav button:has-text("Expenses")').first().click({ force: true });
+await page.waitForTimeout(1500);
+const ibisRow = page.locator('.nf-ios-expense-row').filter({ hasText: 'Ibis' }).first();
+check('le badge « To fix » est visible sur la carte', await ibisRow.locator('[data-nf-to-fix]').isVisible().catch(() => false));
+check('le nombre de commentaires est affiche',
+  /1/.test(await ibisRow.locator('[data-nf-comment-count]').innerText().catch(() => '')));
+check('une carte sans commentaire n a pas de badge',
+  await page.locator('.nf-ios-expense-row').filter({ hasText: 'SBB' }).locator('.nf-review-chips').count() === 0);
+await shot('06b-carte-a-corriger');
+await ibisRow.locator('[data-nf-comments-open]').click({ force: true });
+await page.waitForTimeout(800);
+const thread = page.locator('[data-nf-comments-sheet]');
+check('le fil s ouvre', await thread.count() === 1);
+check('il est porte sur <body>',
+  await page.evaluate(() => document.querySelector('[data-nf-comments-sheet]')?.parentElement === document.body));
+check('la question de la finance est lisible',
+  /client visit/.test(await thread.innerText().catch(() => '')));
+check('le bandeau de correction est affiche', await page.locator('[data-nf-to-fix-banner]').count() === 1);
+check('l employe ne peut pas lever le statut', await page.locator('[data-nf-resolve]').count() === 0);
+mark = calls.length;
+await page.locator('[data-nf-comment-input]').fill('Yes, lunch with Acme SA. Note updated.');
+await page.locator('[data-nf-comment-send]').click({ force: true });
+await page.waitForTimeout(1200);
+const sent = since(mark).find(c => c.method === 'POST' && c.path === '/api/expense-comments');
+check('la reponse part vers l API', !!sent && /Acme/.test(sent.body?.body || ''));
+check('elle ne tente pas de changer le statut', !!sent && !('review_status' in (sent.body || {})));
+check('elle apparait dans le fil', await page.locator('[data-nf-comment]').count() === 2);
+await shot('06b-fil');
+await page.locator('[data-nf-comments-sheet] button[aria-label="Close comments"]').click({ force: true });
+await page.waitForTimeout(600);
+check('le compteur passe a 2',
+  /2/.test(await ibisRow.locator('[data-nf-comment-count]').innerText().catch(() => '')));
+
 // ── 6 · Suppression ───────────────────────────────────────────────────
 console.log('\n6. Suppression');
 await page.locator('#test-bottom-nav button:has-text("Expenses")').first().click({ force: true });
 await page.waitForTimeout(1500);
 mark = calls.length;
-await page.locator('.nf-ios-expense-actions button').last().click({ force: true });
+await page.locator('.nf-ios-expense-actions button[title="Delete"]').last().click({ force: true });
 await page.waitForTimeout(900);
 const del = page.locator('[data-nf-delete-confirm]');
 check('la confirmation s ouvre', await del.count() === 1);
@@ -395,7 +445,7 @@ check('« garder » referme sans supprimer',
   since(mark).every(c => c.method !== 'DELETE'));
 
 const before = await page.locator('.nf-ios-expense-row').count();
-await page.locator('.nf-ios-expense-actions button').last().click({ force: true });
+await page.locator('.nf-ios-expense-actions button[title="Delete"]').last().click({ force: true });
 await page.waitForTimeout(900);
 mark = calls.length;
 await page.locator('.nfm-del-go').click({ force: true });

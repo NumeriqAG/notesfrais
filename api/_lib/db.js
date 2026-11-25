@@ -11,7 +11,17 @@ function sql() {
 
 async function ensureSchema() {
   if (!schemaReady) {
-    schemaReady = sql()`alter table expenses add column if not exists receipt_items jsonb not null default '[]'::jsonb`;
+    const db = sql();
+    schemaReady = (async () => {
+      await db`alter table expenses add column if not exists receipt_items jsonb not null default '[]'::jsonb`;
+      // Fil de commentaires finance <-> employe et statut de controle
+      // (« a corriger »). Voir api/expense-comments.js.
+      await db`alter table expenses add column if not exists comments jsonb not null default '[]'::jsonb`;
+      await db`alter table expenses add column if not exists review_status text not null default 'ok'`;
+    })();
+    // Un echec (reseau, droits) ne doit pas rester en cache pour toute la vie
+    // de l'instance : on retentera a la requete suivante.
+    schemaReady.catch(() => { schemaReady = null; });
   }
   await schemaReady;
 }
