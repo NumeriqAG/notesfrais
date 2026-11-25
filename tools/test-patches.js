@@ -172,6 +172,12 @@ const REQUIRED = {
     ['commentaires : correction rouverte sur un mois clos', 'data-nf-fix-edit'],
     ['commentaires : pastilles cote finance', "<NfReviewChips expense={e}/>{rowIssues.length===0&&e.reviewStatus!=='to_fix'"],
     ['commentaires : bouton cote finance', '<NfCommentsButton expense={e} onUpdated={saveEdited}/>'],
+    ['identite Numeriq Payroll : feuille de style', 'NOTESFRAIS_BRAND_V1'],
+    ['icones au trait de la barre du bas', 'nf-tab-icons'],
+    ['identite : logo sur la connexion', '/logo-numeriq-mark.png'],
+    ['identite : icone d ecran d accueil', '/apple-touch-icon.png'],
+    ['lecture ratee : diagnostic replie, pas retire', 'nfm-ocr-details'],
+    ['montants au format suisse', '(?=(\\d{3})+(?!\\d))'],
     ['notifications push : proposition', 'function NfdPushOptIn('],
     ['notifications push : placee dans l onglet Expenses', '<NfdPushOptIn/>'],
   ],
@@ -204,6 +210,8 @@ const FORBIDDEN = [
   // notesfrais-english-final.js ne matche plus.
   ['plus de francais visible', /Submittedsion|receiptperes|Expenses enregistr|R\u00e9sum\u00e9 avant soumission|D\u00e9tail par cat\u00e9gorie|Glissez votre|placeholder="Mot de passe"|Paiement CB|'Carte utilisee: (entreprise|perso)'/],
   ['plus de mojibake dans le HTML final', /\u00e2\u20ac|\u00c3[\u00a0-\u00bf\u2014]/],
+  // Le bleu roi d'avant le logo : il revient si un patch recolle une couleur.
+  ['plus de l ancien bleu roi', /#1A3FB5|rgba\(26,63,181,/i],
   ['plus d annee 2026 en dur', /\{v:'2026-\d\d'|'Year 2026'|year 2026|'2026-03'|\/2026\//],
 ];
 

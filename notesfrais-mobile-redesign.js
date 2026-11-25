@@ -56,7 +56,7 @@
     // fermeture complete. A bumper a chaque livraison.
     must(
       "const fmt=n=>Number(n||0).toFixed(2);",
-      "const NOTESFRAIS_BUILD='2026-11-25-c';\nconst fmt=n=>Number(n||0).toFixed(2);"
+      "const NOTESFRAIS_BUILD='2026-11-25-e';\nconst fmt=n=>Number(n||0).toFixed(2);"
     );
 
     const style = `<style id="notesfrais-mobile-redesign-v1">

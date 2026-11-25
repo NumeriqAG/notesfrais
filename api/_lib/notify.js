@@ -198,7 +198,13 @@ async function sendPush({ channel, title, body, tag }) {
 }
 
 async function notifyUser({ channel, title, body, intro, message, tag, idempotencyKey }) {
-  const target = sanitizeChannel(channel);
+  // Canal inconnu : ne rien envoyer plutot que de retomber sur 'mike'. Une
+  // action sur le canal 'test' ne doit jamais atteindre Mike.
+  if (channel !== 'mike' && channel !== 'test') {
+    const skipped = { ok: false, skipped: true, reason: 'Unknown channel' };
+    return { email: skipped, push: skipped };
+  }
+  const target = channel;
   const safeTitle = cleanText(title, 'NotesFrais');
   const email = await sendEmail({
     channel: target,
