@@ -74,6 +74,7 @@ base côté client. Le front parle à des routes serverless :
 | `POST /api/expense-comments` | Commentaire sur un frais, et statut « à corriger » (`review_status`, finance seulement). |
 | `GET/POST /api/month-review` | **Décision de la finance sur un mois soumis** : approuver, renvoyer (rouvre le mois), marquer remboursé, annuler. Finance seule en écriture ; un `user` ne lit que son canal. Table `month_reviews`. |
 | `GET/POST/DELETE /api/push-subscription` | Clé VAPID publique, abonnement Web Push de l'iPhone (compte `user` seulement, canal forcé depuis la session). |
+| `GET /api/cron/monthly-reminder` | **Rappel de fin de mois** à l'utilisateur (email + push), lancé chaque jour par Vercel Cron. Protégé par `CRON_SECRET`. |
 | `POST /api/notify-submission` | Email de notification simple. Probablement supplanté par la route ci-dessus — à vérifier avant de s'en servir. |
 
 ### Les deux canaux
@@ -496,6 +497,15 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
   sinon l'email du compte `user` du canal. Les SW affichent **toujours** une
   notification sur `push` : sur iOS, un push silencieux fait révoquer
   l'abonnement.
+- **Rappel de fin de mois.** `api/cron/monthly-reminder.js`, appelé par Vercel
+  Cron chaque jour à 06:00 UTC (`vercel.json`). En heure de Zurich : le dernier
+  jour du mois si le mois contient des frais non soumis, puis le 3 et le 7 du
+  mois suivant s'il n'est toujours pas soumis. Le message compte les frais sans
+  justificatif et ceux « à corriger ». Journal anti-doublon `reminder_log`.
+  Canal `mike` seulement par défaut (`MONTHLY_REMINDER_CHANNELS`). **Sans
+  `CRON_SECRET`, la route refuse tout.** Les lignes du relevé UBS ne sont pas
+  stockées côté serveur : le rappel ne peut pas encore citer les paiements UBS
+  sans reçu.
 - **Copie des reçus par email.** À chaque frais créé avec justificatif, un email
   part vers `RECEIPT_BACKUP_EMAIL` (défaut : l'email de la session).
 - **Offline.** IndexedDB `notesfrais-offline-v1`, fichier sérialisé en data-URL
@@ -514,7 +524,8 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
 `MONTHLY_SUBMISSION_TEST_EMAIL` · `RECEIPT_BACKUP_EMAIL` · `RECEIPT_MAIL_FROM` ·
 `SUBMISSION_MAIL_FROM` · `USER_NOTIFICATION_EMAIL` · `USER_NOTIFICATION_TEST_EMAIL` ·
 `USER_NOTIFICATION_FROM` · `APP_BASE_URL` · `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` ·
-`VAPID_SUBJECT` (paire générée par `node scripts/generate-vapid-keys.mjs`). Modèle
+`VAPID_SUBJECT` (paire générée par `node scripts/generate-vapid-keys.mjs`) ·
+`CRON_SECRET` · `MONTHLY_REMINDER_CHANNELS`. Modèle
 complet dans `.env.example`.
 
 ---

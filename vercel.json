@@ -51,5 +51,11 @@
         }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/monthly-reminder",
+      "schedule": "0 6 * * *"
+    }
   ]
 }
