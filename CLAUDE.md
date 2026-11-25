@@ -71,6 +71,7 @@ base côté client. Le front parle à des routes serverless :
 | `GET/POST/PATCH/DELETE /api/expenses` | CRUD des frais. **Impose le canal et les droits.** |
 | `GET/POST/DELETE /api/receipts` | Upload, URL signée et suppression des justificatifs dans R2. |
 | `POST /api/monthly-submission` | Clôture le mois + email à la finance **avec les justificatifs en ZIP**. |
+| `POST /api/expense-comments` | Commentaire sur un frais, et statut « à corriger » (`review_status`, finance seulement). |
 | `GET/POST /api/month-review` | **Décision de la finance sur un mois soumis** : approuver, renvoyer (rouvre le mois), marquer remboursé, annuler. Finance seule en écriture ; un `user` ne lit que son canal. Table `month_reviews`. |
 | `GET/POST/DELETE /api/push-subscription` | Clé VAPID publique, abonnement Web Push de l'iPhone (compte `user` seulement, canal forcé depuis la session). |
 | `POST /api/notify-submission` | Email de notification simple. Probablement supplanté par la route ci-dessus — à vérifier avant de s'en servir. |
@@ -232,7 +233,13 @@ légères au vol. Le schéma de référence est `db/schema.sql`.
 category, currency, status ('pending'|'reconciled'), note, ubs_label, ubs_date,
 amt_diff, receipt_url, receipt_name, receipt_items (jsonb), app_channel
 ('mike'|'test'), submission_status ('pending'|'to_submit'|'submitted'),
-submitted_at`
+submitted_at, comments (jsonb), review_status ('ok'|'to_fix')`
+
+**`comments`** est le fil finance ↔ employé,
+`[{id, at, role, email, kind:'comment'|'status', body?, review_status?}]`,
+écrit uniquement par `/api/expense-comments` (ajout atomique). Un frais
+`to_fix` reste **modifiable par l'employé même dans un mois soumis**, sans
+pouvoir changer de mois (`api/expenses.js`).
 
 **Table `month_reviews`** — `app_channel, month ('AAAA-MM'), status ('approved'|'sent_back'|'reimbursed'), note, decided_at, decided_by`, clé `(app_channel, month)`. Pas de ligne = soumis et en attente de contrôle (ou mois ouvert). Renvoyer repasse les frais du mois en `pending` ; une nouvelle soumission efface le `sent_back`. Créée à la demande par `api/_lib/month-review.js`.
 
@@ -324,8 +331,9 @@ l'époque Supabase et continuent de tourner grâce au shim.
 | 42 | `mobile-redesign.js` | Refonte mobile (feuille de capture, récapitulatif du mois, diagnostic OCR, `NOTESFRAIS_BUILD`). |
 | 43 | `year.js` | **Année active** : `MONTHS` = les 12 mois de l'année en cours, ou d'une année passée choisie dans les sélecteurs (« Other years », ou le sélecteur du mode « Full year »). Le choix recharge la page et vit en `sessionStorage`. Chargé en dernier, en anglais. |
 | 44 | `english-final.js` | **Dernier français visible** traduit sur le code final (UBS, réglages finance, stats, toasts, erreurs, `<title>`), et relecture des notes « Carte utilisee: … » déjà en base. Paires exactes : une cible qui dérive apparaît en no-op. `test-patches.js` interdit le retour de ces chaînes. |
-| 45 | `month-review.js` | **Circuit de validation au niveau du mois** (choix de Thomas, nov. 2026 : pas de statut frais par frais). Bloc « Decision for … » dans la revue finance (Approve / Send back avec motif obligatoire / Mark reimbursed / Undo), pastille sur le dashboard, bandeau et pastille côté utilisateur. Chargé après `english-final`, en anglais ; chaque cible manquante **lève une erreur** au lieu d'un no-op. |
-| 46 | `push-optin.js` | Propose à l'utilisateur d'activer les notifications push (onglet Expenses). Dans Safari sur iPhone, explique d'abord l'ajout à l'écran d'accueil : le Web Push iOS (16.4+) n'existe que dans la PWA installée. Chargé en dernier, en anglais. |
+| 45 | `expense-comments.js` | **Commentaires sur un frais** : bouton 💬 et pastilles « To fix » / 💬 n sur la carte employé et dans le tableau finance, fil en feuille plein écran, case « Mark as To fix » et « Mark as resolved » côté finance, bouton « Fix » sur un frais à corriger d'un mois clos. Chargé en dernier, en anglais. |
+| 46 | `month-review.js` | **Circuit de validation au niveau du mois** (choix de Thomas, nov. 2026 : pas de statut frais par frais). Bloc « Decision for … » dans la revue finance (Approve / Send back avec motif obligatoire / Mark reimbursed / Undo), pastille sur le dashboard, bandeau et pastille côté utilisateur. Chargé après `english-final`, en anglais ; chaque cible manquante **lève une erreur** au lieu d'un no-op. |
+| 47 | `push-optin.js` | Propose à l'utilisateur d'activer les notifications push (onglet Expenses). Dans Safari sur iPhone, explique d'abord l'ajout à l'écran d'accueil : le Web Push iOS (16.4+) n'existe que dans la PWA installée. Chargé en dernier, en anglais. |
 
 ---
 
