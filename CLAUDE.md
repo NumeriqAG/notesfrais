@@ -71,6 +71,7 @@ base côté client. Le front parle à des routes serverless :
 | `GET/POST/PATCH/DELETE /api/expenses` | CRUD des frais. **Impose le canal et les droits.** |
 | `GET/POST/DELETE /api/receipts` | Upload, URL signée et suppression des justificatifs dans R2. |
 | `POST /api/monthly-submission` | Clôture le mois + email à la finance **avec les justificatifs en ZIP**. |
+| `POST /api/expense-comments` | Commentaire sur un frais, et statut « à corriger » (`review_status`, finance seulement). |
 | `POST /api/notify-submission` | Email de notification simple. Probablement supplanté par la route ci-dessus — à vérifier avant de s'en servir. |
 
 ### Les deux canaux
@@ -225,7 +226,13 @@ légères au vol. Le schéma de référence est `db/schema.sql`.
 category, currency, status ('pending'|'reconciled'), note, ubs_label, ubs_date,
 amt_diff, receipt_url, receipt_name, receipt_items (jsonb), app_channel
 ('mike'|'test'), submission_status ('pending'|'to_submit'|'submitted'),
-submitted_at`
+submitted_at, comments (jsonb), review_status ('ok'|'to_fix')`
+
+**`comments`** est le fil finance ↔ employé,
+`[{id, at, role, email, kind:'comment'|'status', body?, review_status?}]`,
+écrit uniquement par `/api/expense-comments` (ajout atomique). Un frais
+`to_fix` reste **modifiable par l'employé même dans un mois soumis**, sans
+pouvoir changer de mois (`api/expenses.js`).
 
 **Table `login_attempts`** — limitation des tentatives de connexion, créée à la
 demande.
@@ -315,6 +322,7 @@ l'époque Supabase et continuent de tourner grâce au shim.
 | 42 | `mobile-redesign.js` | Refonte mobile (feuille de capture, récapitulatif du mois, diagnostic OCR, `NOTESFRAIS_BUILD`). |
 | 43 | `year.js` | **Année active** : `MONTHS` = les 12 mois de l'année en cours, ou d'une année passée choisie dans les sélecteurs (« Other years », ou le sélecteur du mode « Full year »). Le choix recharge la page et vit en `sessionStorage`. Chargé en dernier, en anglais. |
 | 44 | `english-final.js` | **Dernier français visible** traduit sur le code final (UBS, réglages finance, stats, toasts, erreurs, `<title>`), et relecture des notes « Carte utilisee: … » déjà en base. Paires exactes : une cible qui dérive apparaît en no-op. `test-patches.js` interdit le retour de ces chaînes. |
+| 45 | `expense-comments.js` | **Commentaires sur un frais** : bouton 💬 et pastilles « To fix » / 💬 n sur la carte employé et dans le tableau finance, fil en feuille plein écran, case « Mark as To fix » et « Mark as resolved » côté finance, bouton « Fix » sur un frais à corriger d'un mois clos. Chargé en dernier, en anglais. |
 
 ---
 

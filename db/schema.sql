@@ -19,9 +19,12 @@ create table if not exists expenses (
   app_channel text not null default 'mike',
   submission_status text not null default 'pending',
   submitted_at timestamptz,
+  comments jsonb not null default '[]'::jsonb,
+  review_status text not null default 'ok',
   constraint expenses_status_check check (status in ('pending', 'reconciled')),
   constraint expenses_channel_check check (app_channel in ('mike', 'test')),
-  constraint expenses_submission_status_check check (submission_status in ('pending', 'to_submit', 'submitted'))
+  constraint expenses_submission_status_check check (submission_status in ('pending', 'to_submit', 'submitted')),
+  constraint expenses_review_status_check check (review_status in ('ok', 'to_fix'))
 );
 
 create index if not exists expenses_channel_date_idx
