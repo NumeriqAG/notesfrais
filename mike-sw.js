@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notesfrais-mike-shell-v79';
+const CACHE_NAME = 'notesfrais-mike-shell-v80';
 
 const SHELL_FILES = [
   '/mike',
@@ -51,7 +51,12 @@ const SHELL_FILES = [
   '/notesfrais-year.js',
   '/notesfrais-english-final.js',
   '/notesfrais-expense-comments.js',
-  '/notesfrais-month-review.js'
+  '/notesfrais-month-review.js',
+  '/notesfrais-brand.js',
+  '/logo-numeriq-mark.png',
+  '/logo-numeriq-payroll-full.png',
+  '/apple-touch-icon.png',
+  '/icon-192.png'
 ];
 
 const EXTERNAL_FILES = [
