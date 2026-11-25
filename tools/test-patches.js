@@ -134,6 +134,10 @@ section('3. Fonctionnalites presentes dans le HTML genere');
 const REQUIRED = {
   all: [
     ['AccessGate present', 'function AccessGate('],
+    ['decision du mois : route API', '/api/month-review'],
+    ['decision du mois : bloc finance', 'function NfFinanceMonthDecision('],
+    ['decision du mois : bandeau utilisateur', '<NfUserMonthReviewBanner review={nfMonthReviews[month]||null}'],
+    ['decision du mois : branchee dans la revue finance', '<NfFinanceMonthDecision month={month}'],
     ['login par cookie signe', '/api/session'],
     ['frais lus et ecrits par l API', '/api/expenses'],
     ['justificatifs via l API R2', '/api/receipts'],

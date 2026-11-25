@@ -22,6 +22,8 @@
 import { chromium } from 'playwright';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { createServer } from 'node:http';
+import { extname, join, normalize } from 'node:path';
 
 const channel = process.argv[2] || 'mike';
 const OUT = '.patch-out/e2e';
@@ -80,8 +82,27 @@ const rows = [
 const calls = [];
 let nextId = 100;
 
+// Servi en http://127.0.0.1 et non plus en file:// : les Chromium recents
+// refusent fetch('/api/...') sous file:// (« URL scheme "file" is not
+// supported ») avant meme que page.route() puisse l'intercepter, et l'app
+// restait bloquee sur l'ecran de connexion.
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.woff2': 'font/woff2', '.png': 'image/png' };
+const server = createServer((req, res) => {
+  const rel = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '');
+  if (rel.startsWith('..')) { res.statusCode = 403; return res.end(); }
+  try {
+    const body = readFileSync(join('.patch-out', rel));
+    res.setHeader('Content-Type', TYPES[extname(rel)] || 'application/octet-stream');
+    res.end(body);
+  } catch (_) { res.statusCode = 404; res.end(); }
+});
+await new Promise(r => server.listen(0, '127.0.0.1', r));
+const BASE = `http://127.0.0.1:${server.address().port}`;
+
+// Chemin historique du conteneur ; ailleurs, Playwright trouve son navigateur.
+const LEGACY_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  ...(existsSync(LEGACY_CHROME) ? { executablePath: LEGACY_CHROME } : {}),
   args: ['--no-sandbox']
 });
 const page = await browser.newPage({
@@ -101,7 +122,12 @@ page.on('pageerror', e => errors.push(String(e).split('\n')[0].slice(0, 200)));
 // branche d'echec s'exerce tout de suite au lieu d'attendre le timeout de 90 s.
 await page.route('**/tesseract*', route => route.abort());
 
-await page.route('**/api/**', async route => {
+// Etat simule de /api/month-review et role de la session : la section 9
+// rejoue la decision de la finance, puis ce que Mike en voit.
+let role = 'user';
+const reviews = {};
+
+const apiHandler = async route => {
   const req = route.request();
   const url = new URL(req.url());
   const method = req.method();
@@ -112,7 +138,24 @@ await page.route('**/api/**', async route => {
 
   if (url.pathname === '/api/session') {
     return json({ ok: true, session: { user: { id: 'mike', email: 'mike@numeriq.ch' } },
-                  profile: { role: 'user', app_channel: channel } });
+                  profile: { role, app_channel: role === 'finance' ? 'all' : channel } });
+  }
+  if (url.pathname === '/api/month-review') {
+    if (method === 'GET') return json({ ok: true, data: Object.values(reviews) });
+    const { month, action, note = '' } = body || {};
+    const inMonth = r => String(r.date).startsWith(month);
+    const decided_at = new Date().toISOString();
+    if (action === 'approve') reviews[month] = { app_channel: channel, month, status: 'approved', note, decided_at };
+    if (action === 'reimburse') reviews[month] = { ...reviews[month], status: 'reimbursed', decided_at };
+    if (action === 'undo') {
+      if (reviews[month] && reviews[month].status === 'reimbursed') reviews[month] = { ...reviews[month], status: 'approved' };
+      else delete reviews[month];
+    }
+    if (action === 'send_back') {
+      reviews[month] = { app_channel: channel, month, status: 'sent_back', note, decided_at };
+      rows.filter(inMonth).forEach(r => { r.submission_status = 'pending'; r.submitted_at = null; });
+    }
+    return json({ ok: true, month, action, review: reviews[month] || null });
   }
   if (url.pathname === '/api/receipts') return json({ ok: true, url: 'about:blank' });
   if (url.pathname === '/api/monthly-submission') {
@@ -137,7 +180,8 @@ await page.route('**/api/**', async route => {
     return json({ ok: true, data: from ? rows.filter(r => String(r.date).startsWith(from)) : [] });
   }
   return json({ ok: true, data: [] });
-});
+};
+await page.route('**/api/**', apiHandler);
 
 // ── Assertions ────────────────────────────────────────────────────────
 let pass = 0, fail = 0;
@@ -148,7 +192,7 @@ const check = (label, ok, detail = '') => {
 const shot = name => page.screenshot({ path: `${OUT}/${channel}-${name}.png` });
 const since = n => calls.slice(n);
 
-await page.goto(`file://${process.cwd()}/.patch-out/e2e.html`, { waitUntil: 'load' });
+await page.goto(`${BASE}/e2e.html`, { waitUntil: 'load' });
 await page.waitForTimeout(6000);
 
 // ── 1 · La feuille de capture ─────────────────────────────────────────
@@ -491,6 +535,89 @@ if (await yearPicker.count()) {
     await page.locator('[data-nf-year-picker]').first().inputValue().catch(() => '') === 'nfyear:2027');
 }
 
+// ── 9 · Decision de la finance sur le mois ───────────────────────────
+// Choix de Thomas (nov. 2026) : la finance decide au niveau du MOIS.
+console.log('\n9. Decision de la finance');
+const freshPage = async (viewport, mobile) => {
+  const p = await browser.newPage({ viewport, deviceScaleFactor: 2, isMobile: mobile, hasTouch: mobile });
+  await p.clock.install({ time: new Date(`${today}-20T10:00:00`) });
+  p.on('pageerror', e => errors.push(String(e).split('\n')[0].slice(0, 200)));
+  await p.route('**/tesseract*', route => route.abort());
+  await p.route('**/api/**', apiHandler);
+  await p.goto(`${BASE}/e2e.html`, { waitUntil: 'load' });
+  await p.waitForTimeout(6000);
+  return p;
+};
+rows.splice(0, rows.length,
+  expense(1, 3, 'Brasserie de la Paix', 67.2, 'repas', 'reconciled', 'Payment card: company'),
+  expense(2, 5, 'SBB CFF Billetterie', 48, 'transport', 'reconciled', 'Payment card: company'));
+rows.forEach(r => { r.submission_status = 'submitted'; r.submitted_at = `${today}-19T08:00:00.000Z`; });
+role = 'finance';
+const fin = await freshPage({ width: 1280, height: 900 }, false);
+await fin.locator('button:has-text("August 2026")').first().click({ force: true });
+await fin.waitForTimeout(1200);
+const decision = fin.locator('[data-nf-month-decision]');
+check('la revue du mois porte le bloc de decision', await decision.count() === 1);
+check('un mois soumis attend la decision', await decision.getAttribute('data-nf-month-decision').catch(() => '') === 'submitted');
+await fin.screenshot({ path: `${OUT}/${channel}-10-finance-a-decider.png` });
+
+mark = calls.length;
+await fin.locator('button:has-text("Approve month")').click({ force: true });
+await fin.waitForTimeout(900);
+const approveCall = since(mark).find(c => c.method === 'POST' && c.path === '/api/month-review');
+check('Approuver appelle l API', !!approveCall && approveCall.body.action === 'approve' && approveCall.body.month === `${today}`,
+  JSON.stringify(approveCall && approveCall.body));
+check('le canal est transmis', !!approveCall && approveCall.body.channel === channel);
+check('le mois passe a Approved', await decision.getAttribute('data-nf-month-decision').catch(() => '') === 'approved');
+
+await fin.locator('button:has-text("Mark reimbursed")').click({ force: true });
+await fin.waitForTimeout(900);
+check('puis a Reimbursed', await decision.getAttribute('data-nf-month-decision').catch(() => '') === 'reimbursed');
+await fin.locator('button:has-text("Undo reimbursed")').click({ force: true });
+await fin.waitForTimeout(900);
+check('Undo revient a Approved', await decision.getAttribute('data-nf-month-decision').catch(() => '') === 'approved');
+
+await fin.locator('button:has-text("Send back to user")').click({ force: true });
+await fin.waitForTimeout(500);
+const sendBtn = fin.locator('button:has-text("Send back and reopen the month")');
+check('renvoyer exige un motif', await sendBtn.isDisabled());
+await fin.locator('[data-nf-send-back-form] textarea').fill('Receipt missing for SBB');
+mark = calls.length;
+await sendBtn.click({ force: true });
+await fin.waitForTimeout(900);
+const backCall = since(mark).find(c => c.method === 'POST' && c.path === '/api/month-review');
+check('Renvoyer appelle l API avec le motif', !!backCall && backCall.body.action === 'send_back' && backCall.body.note === 'Receipt missing for SBB',
+  JSON.stringify(backCall && backCall.body));
+check('le mois est marque renvoye', await decision.getAttribute('data-nf-month-decision').catch(() => '') === 'sent_back');
+check('la revue n affiche plus le paquet comme soumis',
+  (await fin.locator('text=Month not submitted').count()) === 1);
+await fin.screenshot({ path: `${OUT}/${channel}-11-finance-renvoye.png` });
+
+await fin.locator('button:has-text("Back inbox")').first().click({ force: true }).catch(() => {});
+await fin.waitForTimeout(900);
+check('le dashboard montre la pastille Sent back', await fin.locator('[data-nf-month-review="sent_back"]').count() >= 1);
+await fin.close();
+
+// ── 10 · Ce que Mike en voit ──────────────────────────────────────────
+console.log('\n10. Ce que Mike voit de la decision');
+role = 'user';
+const mk = await freshPage({ width: 393, height: 852 }, true);
+const back = mk.locator('[data-nf-month-review-banner="sent_back"]');
+check('Mike voit le renvoi', await back.count() === 1);
+check('avec le motif de la finance', (await back.innerText().catch(() => '')).includes('Receipt missing for SBB'));
+check('le mois est de nouveau soumettable',
+  !(await mk.locator('[data-user-submit-placement] > button:not(.nfm-add-link)').isDisabled()));
+await mk.screenshot({ path: `${OUT}/${channel}-12-mike-renvoye.png` });
+await mk.close();
+
+rows.forEach(r => { r.submission_status = 'submitted'; r.submitted_at = `${today}-21T08:00:00.000Z`; });
+reviews[today] = { app_channel: channel, month: today, status: 'approved', note: '', decided_at: `${today}-22T08:00:00.000Z` };
+const mk2 = await freshPage({ width: 393, height: 852 }, true);
+check('Mike voit l approbation', await mk2.locator('[data-nf-month-review-banner="approved"]').count() === 1);
+check('la pastille du mois dit Approved', (await mk2.locator('.nfm-badge').first().innerText().catch(() => '')).trim() === 'Approved');
+await mk2.screenshot({ path: `${OUT}/${channel}-13-mike-approuve.png` });
+await mk2.close();
+
 // ── Bilan ─────────────────────────────────────────────────────────────
 const real = errors.filter(e => !e.includes('ServiceWorkerRegistration'));
 check('aucune erreur JS sur tout le parcours', real.length === 0, real.join(' | '));
@@ -498,4 +625,5 @@ check('aucune erreur JS sur tout le parcours', real.length === 0, real.join(' | 
 console.log(`\n${fail === 0 ? 'OK' : 'ECHEC'} — ${pass}/${pass + fail} verifications (canal ${channel})`);
 console.log(`captures : ${OUT}/`);
 await browser.close();
+server.close();
 process.exit(fail === 0 ? 0 : 1);
