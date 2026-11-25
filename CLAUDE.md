@@ -234,7 +234,9 @@ légères au vol. Le schéma de référence est `db/schema.sql`.
 category, currency, status ('pending'|'reconciled'), note, ubs_label, ubs_date,
 amt_diff, receipt_url, receipt_name, receipt_items (jsonb), app_channel
 ('mike'|'test'), submission_status ('pending'|'to_submit'|'submitted'),
-submitted_at, comments (jsonb), review_status ('ok'|'to_fix')`
+submitted_at, comments (jsonb), review_status ('ok'|'to_fix'), fx_rate, fx_source ('ecb'|'card'|'manual'|'missing'), fx_date`
+
+**Table `fx_rates`** — cache des cours BCE `(currency, day) → rate, rate_day`, jours passés seulement.
 
 **`comments`** est le fil finance ↔ employé,
 `[{id, at, role, email, kind:'comment'|'status', body?, review_status?}]`,
@@ -259,7 +261,7 @@ directement sur R2.
 
 ### Auth
 Cookie `notesfrais_session`, signé HMAC-SHA256 avec `NOTESFRAIS_COOKIE_SECRET`,
-`HttpOnly` / `SameSite=Lax` / `Secure` en production, valable 14 jours.
+`HttpOnly` / `SameSite=Lax` / `Secure` en production, valable 14 jours **glissants** (réémis par `GET /api/session` et `refreshSession`, au plus une fois par heure ; un compte retiré des variables perd sa session à la lecture suivante).
 Vérification en temps constant.
 
 Deux façons de déclarer les comptes, par priorité :
@@ -338,6 +340,9 @@ l'époque Supabase et continuent de tourner grâce au shim.
 | 48 | `push-optin.js` | Propose à l'utilisateur d'activer les notifications push (onglet Expenses). Dans Safari sur iPhone, explique d'abord l'ajout à l'écran d'accueil : le Web Push iOS (16.4+) n'existe que dans la PWA installée. Chargé en dernier, en anglais. |
 | 49 | `mike-home.js` | **Accueil de Mike, suite de la maquette** (nov. 2026) : frais **groupés par jour** (« Today », « Tuesday 18 Aug »), une ligne ouvre la **fiche du frais** (`NfExpenseDetail`, portée sur `<body>` : photo, détails, état UBS, fil de la finance, Edit / Fix / Delete), et la cellule « UBS statement » de la carte du mois **lance l'import UBS**. Sur mobile, Edit, Delete et 💬 ne sont plus sur la ligne mais dans la fiche. Chaque cible manquante lève une erreur. |
 | 50 | `dark.js` | **Mode sombre de l'iPhone**, interface de Mike seulement (`body.nf-ios-mike`) et connexion ; la finance reste claire. Il relit les règles CSS mobiles déjà injectées et en émet une copie sombre d'après une table de couleurs, puis rattrape les styles inline de React par sélecteurs d'attribut (`[style*="background: rgb(255, 255, 255)"]`). **Une nouvelle couleur claire en dur dans un patch mobile doit être ajoutée à la table**, sinon elle reste claire en mode sombre. Ses `replace()` passent par un garde (`R`) : ne rien trouver y est normal. |
+| 51 | `statement.js` | **Relevé de carte ou de banque** : lit les CSV (UBS e-banking, carte UBS, Swisscard, format de l'app), les PDF texte (pdf.js) et les PDF **scannés** (OCR Tesseract page par page). Les cartes de Mike sont Swisscard (Amex + Mastercard), relevé papier du 15 au 14. Rapprochement `nfReconcile` par appariement global : montant (devise d'origine comprise), date ±4 jours, similarité de libellé. Il porte sur **toute la période du relevé**, pas seulement le mois affiché, et ne touche pas un mois soumis côté employé. Un frais en devise rapproché prend le montant réellement débité (`fx_source 'card'`). Bouton « Link » sur une ligne sans reçu proche d'un frais. Le PDF réel de Mike ne va jamais dans le dépôt. Chaque cible manquante lève une erreur. |
+| 52 | `currency.js` | **Devise à la saisie** (CHF par défaut, détectée par l'OCR), montant d'origine sous le CHF dans les listes, onglet finance **« Currencies »** (`NfFxTab`) : sources du CHF (estimation BCE, relevé, finance, cours manquant), correction du cours ou du montant CHF. Côté serveur, `api/_lib/fx.js` estime au cours BCE (Frankfurter, table `fx_rates`) ; une estimation ne remplace jamais une valeur `card` ou `manual`, sauf si montant, devise ou date changent. La TVA récupérable exclut les frais en devise. |
+| 53 | `session.js` | **Session expirée** : un 401 affiche « You are signed out » (et non « Offline ») ; le frais reste dans la file et part après reconnexion. Ping de `/api/session` au retour sur l'app. La resynchro hors ligne ne tourne qu'une fois à la fois (sinon doublons). Côté serveur, `refreshSession` prolonge le cookie (au plus une fois par heure) : la session est glissante. |
 
 ---
 

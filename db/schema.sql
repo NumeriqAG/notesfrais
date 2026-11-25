@@ -21,6 +21,9 @@ create table if not exists expenses (
   submitted_at timestamptz,
   comments jsonb not null default '[]'::jsonb,
   review_status text not null default 'ok',
+  fx_rate numeric,
+  fx_source text,
+  fx_date date,
   constraint expenses_status_check check (status in ('pending', 'reconciled')),
   constraint expenses_channel_check check (app_channel in ('mike', 'test')),
   constraint expenses_submission_status_check check (submission_status in ('pending', 'to_submit', 'submitted')),
@@ -56,6 +59,8 @@ create table if not exists month_reviews (
   constraint month_reviews_status_check check (status in ('approved', 'sent_back', 'reimbursed')),
   constraint month_reviews_channel_check check (app_channel in ('mike', 'test')),
   constraint month_reviews_month_check check (month ~ '^[0-9]{4}-[0-9]{2}$')
+);
+
 -- Abonnements Web Push de la PWA (iOS 16.4+, ecran d'accueil).
 create table if not exists push_subscriptions (
   endpoint text primary key,
@@ -76,4 +81,14 @@ create table if not exists reminder_log (
   kind text not null,
   sent_at timestamptz not null default now(),
   primary key (app_channel, month, kind)
+);
+
+-- Cours de reference de la BCE deja interroges (api/_lib/fx.js).
+create table if not exists fx_rates (
+  currency text not null,
+  day date not null,
+  rate numeric not null,
+  rate_day date,
+  fetched_at timestamptz not null default now(),
+  primary key (currency, day)
 );

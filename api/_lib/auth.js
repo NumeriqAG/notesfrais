@@ -209,6 +209,29 @@ function authenticate(email, password) {
   return safeProfile;
 }
 
+// Profil encore declare pour cette session, ou null (compte retire ou change).
+function currentProfile(session) {
+  const email = String(session && session.email || '').toLowerCase();
+  const profile = profilesFromEnv().find(item => item.email.toLowerCase() === email);
+  if (!profile || profile.role !== session.role || profile.app_channel !== session.app_channel) return null;
+  const { password: _password, passwordHash: _hash, ...safeProfile } = profile;
+  return safeProfile;
+}
+
+// Session glissante : une session utilisee est reconduite pour 14 jours, au
+// plus une fois par heure. Sur iPhone, la PWA reprend souvent sans se
+// recharger : sans ca, Mike etait deconnecte 14 jours apres sa connexion,
+// meme en se servant de l'app tous les jours.
+function refreshSession(req, res, session) {
+  if (!session || !res || typeof res.setHeader !== 'function') return;
+  if (session.exp - Date.now() > MAX_AGE_SECONDS * 1000 - 60 * 60 * 1000) return;
+  const profile = currentProfile(session);
+  if (!profile) return;
+  const existing = res.getHeader && res.getHeader('Set-Cookie');
+  if (existing) return;
+  res.setHeader('Set-Cookie', serializeCookie(makeSession(profile)));
+}
+
 function requireSession(req) {
   const session = readSession(req);
   if (!session) {
@@ -220,6 +243,8 @@ function requireSession(req) {
 }
 
 module.exports = {
+  currentProfile,
+  refreshSession,
   makeSession,
   readSession,
   requireSession,
