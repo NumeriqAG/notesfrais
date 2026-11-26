@@ -70,6 +70,15 @@ if (existsSync('.patch-out/vendor/inter-latin.woff2')) {
   console.log('  (police d apercu absente : les captures utiliseront DejaVu, bien plus large que SF Pro)');
   console.log('  curl -sL -o .patch-out/vendor/inter-latin.woff2 <woff2 Inter latin>');
 }
+// La CSP de production (vercel.json), posee en <meta> : c'est elle qui
+// refusait le cadre d'un PDF pointant vers R2. Sans elle, le banc ne voyait
+// pas la panne. (frame-ancestors est ignore en <meta>, sans effet ici.)
+const CSP = JSON.parse(readFileSync('vercel.json', 'utf8')).headers.flatMap(h => h.headers)
+  .find(h => h.key === 'Content-Security-Policy').value.replace(/frame-ancestors[^;]*;?/, '')
+  // R2 est en https (img-src https: l'autorise) ; ici l'« R2 » simule est
+  // http://localhost:<port>, une autre origine que la page (127.0.0.1).
+  .replace('img-src ', 'img-src __R2_ORIGIN__ ');
+html = html.replace('<head>', `<head>\n<meta http-equiv="Content-Security-Policy" content="${CSP}">`);
 writeFileSync('.patch-out/e2e-desktop.html', html);
 
 // Recus de test (synthetiques) : versionnes dans tools/fixtures, copies dans
@@ -128,13 +137,17 @@ const server = createServer((req, res) => {
   const rel = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '');
   if (rel.startsWith('..')) { res.statusCode = 403; return res.end(); }
   try {
-    const body = readFileSync(join('.patch-out', rel));
+    let body = readFileSync(join('.patch-out', rel));
+    if (rel === 'e2e-desktop.html') body = body.toString().split('__R2_ORIGIN__').join(R2);
     res.setHeader('Content-Type', TYPES[extname(rel)] || 'application/octet-stream');
     res.end(body);
   } catch (_) { res.statusCode = 404; res.end(); }
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const BASE = `http://127.0.0.1:${server.address().port}`;
+// Les URL signees pointent vers une AUTRE origine, comme R2 en production :
+// c'est ce qui fait refuser par la CSP un cadre vers elles.
+const R2 = `http://localhost:${server.address().port}`;
 
 const browser = await chromium.launch({
   // Le chemin depend de l'image du conteneur : on prend le premier qui existe.
@@ -207,7 +220,7 @@ const apiHandler = async route => {
         headers: { 'Content-Disposition': 'attachment' },
         body: readFileSync(`${FX}/${pdf ? 'hotel-invoice.pdf' : 'taxi.jpg'}`) });
     }
-    return json({ ok: true, signedUrl: `${BASE}/fx/${/\.pdf$/i.test(path) ? 'hotel-invoice.pdf' : 'taxi.jpg'}` });
+    return json({ ok: true, signedUrl: `${R2}/fx/${/\.pdf$/i.test(path) ? 'hotel-invoice.pdf' : 'taxi.jpg'}` });
   }
   // Lecture par IA : d'abord sans cle (503, l'app retombe sur Tesseract),
   // puis avec une reponse type pour verifier le remplissage du formulaire.
@@ -315,6 +328,18 @@ check('soumission discrete tant qu un recu manque', await page.locator('[data-nf
 check('montant d origine sous le CHF (EUR)', (await page.locator('[data-nf-ws-row="1"] .nfw-c-amt').innerText()).includes('EUR'));
 await shot('01-espace-1440');
 
+// La galerie (plusieurs pieces) : la 2e est un PDF, affiche depuis blob:.
+await page.locator('.nfw-rc-pager button[aria-label="Previous receipt"]').click();
+await page.waitForTimeout(600);
+await page.locator('[data-nf-ws-detail] .nfw-rc-open').click();
+await page.waitForTimeout(800);
+await page.locator('.nf-user-gallery button[aria-label="Next receipt"]').click();
+await page.waitForTimeout(900);
+check('galerie : le PDF s affiche depuis blob:', ((await page.locator('.nf-user-gallery [data-nf-pdf-frame="ready"] iframe').getAttribute('src').catch(() => '')) || '').startsWith('blob:'));
+await shot('01a-galerie-pdf');
+await page.locator('button[aria-label="Close receipts"]').click();
+await page.waitForTimeout(400);
+
 // Clavier : fleche bas = frais suivant.
 await page.mouse.click(5, 895);
 await page.keyboard.press('ArrowDown');
@@ -406,6 +431,16 @@ check('1000 px : panneau « Add receipts from your computer »', await page.loca
 const sumDisplay = await page.locator('[data-user-submit-placement]').evaluate(el => getComputedStyle(el).display);
 check('1000 px : carte du mois en grille', sumDisplay === 'grid', sumDisplay);
 await shot('01f-1000');
+// La visionneuse d'avant (Mike et finance) : un PDF passe par raw=1 et blob:,
+// la CSP de production refusant un cadre vers l'URL signee R2.
+await page.locator('[data-nfm-expenses] button[title="View receipt"]').nth(1).click();
+await page.waitForTimeout(900);
+check('visionneuse : PDF affiche depuis blob:', ((await page.locator('[data-nf-pdf-frame="ready"] iframe').getAttribute('src').catch(() => '')) || '').startsWith('blob:'));
+check('visionneuse : aucun cadre vers l URL signee', await page.locator('iframe[src^="http"]').count() === 0);
+await shot('01g-visionneuse-pdf');
+await page.keyboard.press('Escape');
+await page.locator('button[aria-label="Close receipt"]').click().catch(() => {});
+await page.waitForTimeout(400);
 await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForTimeout(1600);
 
