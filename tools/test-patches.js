@@ -141,6 +141,8 @@ const REQUIRED = {
     ['ordinateur : espace de travail grand ecran', '{nfDeskWide&&tab===\'expenses\'&&<NfDeskWorkspace '],
     ['ordinateur : soumission partagee avec le bouton existant', 'const nfDeskSubmit=async()=>{if(mE.length===0||syncing'],
     ['ordinateur : PDF affiche en blob: via raw=1', "raw:'1'});"],
+    ['visionneuse : PDF en blob: (la CSP refuse un cadre vers R2)', '<NfPdfFrame path={path} name={name} url={url}'],
+    ['galerie : PDF en blob:', '<NfPdfFrame dark path={item.path}'],
     ['lecture IA : route API', "fetch('/api/receipt-ai'"],
     ['periode compacte : feuille de choix', 'function NfPeriodSheet('],
     ['periode compacte : montee dans l App', '<NfPeriodSheet tab={tab}'],
