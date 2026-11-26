@@ -509,6 +509,11 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
   sinon l'email du compte `user` du canal. Les SW affichent **toujours** une
   notification sur `push` : sur iOS, un push silencieux fait révoquer
   l'abonnement.
+  ⚠ **Ces emails sont coupés par défaut** (choix de Thomas, 26 nov. 2026, à la
+  livraison à Mike) : décision sur le mois, commentaire / « to fix » et rappel de
+  fin de mois ne partent qu'en Web Push. `USER_NOTIFICATION_EMAILS=on` dans
+  Vercel les remet. La copie des reçus et l'email de soumission à la finance ne
+  sont pas concernés.
 - **Rappel de fin de mois.** `api/cron/monthly-reminder.js`, appelé par Vercel
   Cron chaque jour à 06:00 UTC (`vercel.json`). En heure de Zurich : le dernier
   jour du mois si le mois contient des frais non soumis, puis le 3 et le 7 du
@@ -541,7 +546,7 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
 `R2_SECRET_ACCESS_KEY` · `R2_BUCKET` · `RESEND_API_KEY` ·
 `FINANCE_NOTIFICATION_EMAIL` · `MONTHLY_SUBMISSION_EMAIL` ·
 `MONTHLY_SUBMISSION_TEST_EMAIL` · `RECEIPT_BACKUP_EMAIL` · `RECEIPT_MAIL_FROM` ·
-`SUBMISSION_MAIL_FROM` · `USER_NOTIFICATION_EMAIL` · `USER_NOTIFICATION_TEST_EMAIL` ·
+`SUBMISSION_MAIL_FROM` · `USER_NOTIFICATION_EMAILS` (`on` pour réactiver les emails à l'utilisateur) · `USER_NOTIFICATION_EMAIL` · `USER_NOTIFICATION_TEST_EMAIL` ·
 `USER_NOTIFICATION_FROM` · `APP_BASE_URL` · `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` ·
 `VAPID_SUBJECT` (paire générée par `node scripts/generate-vapid-keys.mjs`) ·
 `CRON_SECRET` · `MONTHLY_REMINDER_CHANNELS` · `ANTHROPIC_API_KEY` (lecture des reçus par IA ; sans elle, Tesseract) · `RECEIPT_AI_MODEL` (défaut `claude-opus-5-5`). Modèle

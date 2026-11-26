@@ -86,7 +86,18 @@ function monthLabelFor(month) {
   return new Date(Date.UTC(year, m - 1, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
+// Emails a l'utilisateur COUPES par defaut (choix de Thomas, 26 nov. 2026,
+// a la livraison a Mike) : decision de la finance sur le mois, commentaire ou
+// « to fix » sur un frais, rappel de fin de mois. Le Web Push et l'affichage
+// dans l'app restent actifs. Pour les remettre : USER_NOTIFICATION_EMAILS=on
+// dans Vercel. Ne touche ni la copie des recus (receipt-email.js) ni l'email
+// de soumission du mois a la finance (monthly-submission.js).
+function userEmailsEnabled() {
+  return /^(1|on|true|yes)$/i.test(cleanText(process.env.USER_NOTIFICATION_EMAILS));
+}
+
 async function sendEmail({ channel, title, intro, message, idempotencyKey }) {
+  if (!userEmailsEnabled()) return { ok: false, skipped: true, reason: 'User emails disabled (USER_NOTIFICATION_EMAILS)' };
   const to = recipientForChannel(channel);
   const apiKey = process.env.RESEND_API_KEY;
   const gmailUser = cleanText(process.env.GMAIL_SMTP_USER);
@@ -300,5 +311,6 @@ module.exports = {
   notifyExpenseComment,
   describeMonthReview,
   vapidConfig,
-  recipientForChannel
+  recipientForChannel,
+  userEmailsEnabled
 };
