@@ -442,10 +442,19 @@ const sideOk = l => l.sideL === 0 && l.sideT === 0 && l.sideW >= 220 && l.sideW 
 const goTab = async label => { await page.locator(`[data-nf-side] button:has-text("${label}")`).first().click(); await page.waitForTimeout(900); };
 let lay = await layout();
 check('Expenses : barre a gauche sur toute la hauteur', sideOk(lay), JSON.stringify(lay));
+// Thomas, 26 nov. 2026 : « + Add expense » touchait « Import statement »,
+// et la pastille « In progress » du bandeau etait coupee en haut.
+const footGap = async () => page.evaluate(() => { const b = [...document.querySelectorAll('[data-nf-side] button')].filter(x => /Add expense|Import statement/.test(x.textContent));
+  return Math.round(b[1].getBoundingClientRect().top - b[0].getBoundingClientRect().bottom); });
+check('barre : « + Add expense » et « Import statement » ne se touchent pas', await footGap() >= 6, String(await footGap()));
+const pillCut = await page.evaluate(() => { const v = document.querySelector('.nfw-v-pill'), p = v && v.firstElementChild; if (!p) return 'absente';
+  const a = v.getBoundingClientRect(), b = p.getBoundingClientRect(); return getComputedStyle(v).overflow === 'visible' || (b.top >= a.top && b.bottom <= a.bottom) ? '' : 'coupee'; });
+check('bandeau : pastille de statut entiere', pillCut === '', pillCut);
 for (const [label, name] of [['UBS statement', '01h-ubs'], ['Expenses', '01i-retour-expenses'], ['Stats', '01j-stats'], ['Expenses', '01k-retour-expenses'], ['UBS statement', '01l-ubs-2'], ['Stats', '01m-stats-2'], ['Expenses', '01n-retour-final']]) {
   await goTab(label);
   lay = await layout();
   check(label + ' : barre a gauche sur toute la hauteur, contenu a droite', sideOk(lay), JSON.stringify(lay));
+  if (label === 'UBS statement') check('UBS : boutons du pied toujours espaces', await footGap() >= 6, String(await footGap()));
   if (label === 'Expenses') check(label + ' : espace de travail de retour', await page.locator('[data-nf-ws]').isVisible() && (await page.locator('[data-nf-ws]').boundingBox()).x === lay.sideW);
   await shot(name);
 }
@@ -479,6 +488,27 @@ await shot('01g-visionneuse-pdf');
 await page.keyboard.press('Escape');
 await page.locator('button[aria-label="Close receipt"]').click().catch(() => {});
 await page.waitForTimeout(400);
+await page.setViewportSize({ width: 1440, height: 900 });
+await page.waitForTimeout(1600);
+
+// ── 1d · La meme liste sur iPhone (393 px) ─────────────────────────────
+// Ce banc a des frais a plusieurs justificatifs et un PDF, pas e2e-mobile.
+// Finition (26 nov. 2026) : la pastille « +1 » masquait la photo, et un
+// justificatif PDF donnait une vignette vide.
+console.log('\n1d. Liste iPhone : vignettes');
+await page.setViewportSize({ width: 393, height: 852 });
+await page.waitForTimeout(1600);
+{
+  const thumbs = await page.evaluate(() => {
+    const c = document.querySelector('.nf-ios-expense-row .nf-user-receipt-count');
+    const pdf = [...document.querySelectorAll('.nf-ios-expense-receipt button')].find(b => /\.pdf$/i.test(b.title));
+    return { ios: document.body.classList.contains('nf-ios-mike'), count: c ? Math.round(c.getBoundingClientRect().width) : -1,
+             pdf: pdf ? getComputedStyle(pdf, '::before').content : 'absent' };
+  });
+  check('iPhone : pastille « +1 » petite, la photo reste visible', thumbs.ios && thumbs.count > 0 && thumbs.count < 30, JSON.stringify(thumbs));
+  check('iPhone : vignette d un PDF marquee « PDF »', thumbs.pdf === '"PDF"', JSON.stringify(thumbs));
+  await shot('01h-iphone-liste');
+}
 await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForTimeout(1600);
 
