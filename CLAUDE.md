@@ -165,7 +165,7 @@ valide le **comportement**. Il ouvre l'app dans Chromium avec `/api/*` simulé,
 puis **clique** : capture d'un frais, enchaînement « Save and add another »,
 import d'un CSV UBS, suppression avec confirmation, soumission du mois,
 modification d'un frais, passage en janvier 2027 et retour sur décembre 2026.
-121 assertions par canal, dont la lecture par IA et son repli sur Tesseract (sections 2 et 2b), les commentaires (section 6b), la décision de la finance (section 9) et ce que Mike en voit (section 10),
+142 assertions par canal, dont la lecture par IA et son repli sur Tesseract (sections 2 et 2b), les commentaires (section 6b), la décision de la finance (section 9) et ce que Mike en voit (section 10),
 plus un journal des appels API qui prouve qu'un clic a bien agi.
 
 **L'horloge du navigateur est fixée** (`page.clock.install`) au 20 août 2026,
@@ -345,6 +345,7 @@ l'époque Supabase et continuent de tourner grâce au shim.
 | 52 | `currency.js` | **Devise à la saisie** (CHF par défaut, détectée par l'OCR), montant d'origine sous le CHF dans les listes, onglet finance **« Currencies »** (`NfFxTab`) : sources du CHF (estimation BCE, relevé, finance, cours manquant), correction du cours ou du montant CHF. Côté serveur, `api/_lib/fx.js` estime au cours BCE (Frankfurter, table `fx_rates`) ; une estimation ne remplace jamais une valeur `card` ou `manual`, sauf si montant, devise ou date changent. La TVA récupérable exclut les frais en devise. |
 | 53 | `session.js` | **Session expirée** : un 401 affiche « You are signed out » (et non « Offline ») ; le frais reste dans la file et part après reconnexion. Ping de `/api/session` au retour sur l'app. La resynchro hors ligne ne tourne qu'une fois à la fois (sinon doublons). Côté serveur, `refreshSession` prolonge le cookie (au plus une fois par heure) : la session est glissante. |
 | 54 | `receipt-ai.js` | **Lecture des reçus par IA** (nov. 2026, Tesseract lisait trop mal). `runOCR` envoie d'abord la photo à `/api/receipt-ai` ; l'ancien `runOCR` devient `nfTesseractOCR`, le **secours** : hors ligne, sans clé, ou si la route échoue. Le diagnostic commence alors par « AI: <raison> ». Les PDF sont lus aussi (Tesseract ne les lisait pas). La catégorie est remplie. Une réponse arrivée après le choix d'une autre photo est ignorée (`NOTESFRAIS_OCR_SEQ`). Chargé avant `dark.js`, en anglais ; chaque cible manquante lève une erreur. |
+| 55 | `period-compact.js` | **Sélecteur de période compact** (dernier élément de la maquette, nov. 2026) : sur l'iPhone de Mike, le grand titre de l'en-tête EST la période (« August 2026 ⌄ », « Jun – Aug 2026 », « Year 2026 »). Le toucher ouvre `NfPeriodSheet` (portée sur `<body>`) : Month / Range / Full year, grille des 12 mois avec leur nombre de frais, années précédentes (rechargement via `nfSwitchYear`). L'ancien sélecteur reste dans le DOM, **masqué** : `year.js` et les tests lisent encore sa valeur. Le titre est écrit par `window.nfPeriodHeaderSync`, appelé par le tick de `mobile-redesign.js`. Chargé avant `dark.js`. Chaque cible manquante lève une erreur. |
 
 ---
 

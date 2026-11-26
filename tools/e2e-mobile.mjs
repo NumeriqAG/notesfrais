@@ -421,6 +421,65 @@ check('la liste s est allongee',
   String(await page.locator('.nf-ios-expense-row').count()));
 await shot('03-liste');
 
+// ── 4b · Selecteur de periode compact ────────────────────────────────
+// Dernier element de la maquette : le grand titre de l'en-tete EST la periode.
+// Le toucher ouvre une feuille (Month / Range / Full year + grille des mois).
+console.log('\n4b. Selecteur de periode compact');
+const periodTitle = page.locator('#nf-ios-header .nfm-period-title');
+const periodSheet = page.locator('[data-nf-period-sheet]');
+const titleText = async () => (await periodTitle.count()) ? (await periodTitle.innerText()).trim() : '';
+const nRowsAug = await page.locator('.nf-ios-expense-row').count();
+check('le titre de l en-tete est la periode', await titleText() === 'August 2026', await titleText());
+check('il s annonce comme un bouton', await periodTitle.getAttribute('role') === 'button');
+check('l ancien selecteur est masque',
+  !(await page.locator('[data-period-selector]').first().isVisible()));
+await periodTitle.click();
+await page.waitForTimeout(500);
+check('la feuille de periode s ouvre', await periodSheet.count() === 1);
+check('elle propose les douze mois', await periodSheet.locator('[data-nf-period-month]').count() === 12);
+check('aout est selectionne',
+  await periodSheet.locator('[data-nf-period-month="2026-08"].nfm-period-sel').count() === 1);
+const augCell = (await periodSheet.locator('[data-nf-period-month="2026-08"]').innerText()).replace(/\s+/g, ' ');
+check('aout affiche son nombre de frais', augCell === `Aug ${nRowsAug} expenses`, augCell);
+check('le bouton photo passe sous la feuille', !(await page.locator('#test-scan-cta').isVisible()));
+await shot('03b-periode');
+await page.emulateMedia({ colorScheme: 'dark' });
+await page.waitForTimeout(400);
+const sheetBg = await periodSheet.locator('.nfm-period-sheet').evaluate(el => getComputedStyle(el).backgroundColor);
+check('la feuille passe en sombre', sheetBg === 'rgb(24, 33, 43)', sheetBg);
+await shot('03c-periode-sombre');
+await page.emulateMedia({ colorScheme: 'light' });
+await page.waitForTimeout(300);
+
+await periodSheet.locator('[data-nf-period-month="2026-07"]').click();
+await page.waitForTimeout(800);
+check('choisir un mois ferme la feuille', await periodSheet.count() === 0);
+check('le titre suit le mois choisi', await titleText() === 'July 2026', await titleText());
+check('l ancien selecteur suit aussi',
+  await page.locator('[data-period-selector] select').first().inputValue() === '2026-07');
+check('juillet est vide', await page.locator('.nf-ios-expense-row').count() === 0);
+
+await periodTitle.click();
+await page.waitForTimeout(400);
+await periodSheet.locator('.nfm-period-seg button:text-is("Range")').click();
+await periodSheet.locator('[data-nf-period-month="2026-06"]').click();
+await page.waitForTimeout(200);
+check('la plage demande le dernier mois',
+  (await periodSheet.locator('.nfm-period-hint').innerText()).trim() === 'Now tap the last month.');
+await periodSheet.locator('[data-nf-period-month="2026-08"]').click();
+await page.waitForTimeout(800);
+check('la plage s affiche en titre', await titleText() === 'Jun – Aug 2026', await titleText());
+check('la plage reprend les frais d aout', await page.locator('.nf-ios-expense-row').count() === nRowsAug);
+await shot('03d-plage');
+
+await periodTitle.click();
+await page.waitForTimeout(400);
+await periodSheet.locator('.nfm-period-seg button:text-is("Month")').click();
+await periodSheet.locator('[data-nf-period-month="2026-08"]').click();
+await page.waitForTimeout(800);
+check('retour sur aout', await titleText() === 'August 2026' &&
+  await page.locator('.nf-ios-expense-row').count() === nRowsAug, await titleText());
+
 // ── 5 · Import UBS — la regression corrigee ───────────────────────────
 console.log('\n5. Import UBS');
 const errBefore = errors.length;
@@ -656,10 +715,16 @@ check('2026 reste proposee', await monthSelect.locator('option[value="nfyear:202
 check('aucun mois de 2026 n est melange a 2027',
   await monthSelect.locator('option[value^="2026-"]').count() === 0);
 
+check('l en-tete annonce janvier 2027', await titleText() === 'January 2027', await titleText());
+await periodTitle.click();
+await page.waitForTimeout(400);
+check('la feuille propose 2026 et 2027',
+  await periodSheet.locator('[data-nf-period-year]').count() === 2);
+await shot('09a-periode-2027');
 mark = calls.length;
 await Promise.all([
   page.waitForEvent('load'),
-  monthSelect.selectOption('nfyear:2026')
+  periodSheet.locator('[data-nf-period-year="2026"]').click()
 ]);
 await page.waitForTimeout(6000);
 check('revenir sur 2026 ouvre decembre', await page.locator('[data-period-selector] select').first().inputValue() === '2026-12');
@@ -670,16 +735,20 @@ check('les mois de 2026 sont recharges',
 check('2027 reste atteignable', await page.locator('[data-period-selector] select option[value="nfyear:2027"]').count() === 1);
 await shot('09-decembre-2026');
 
-await page.locator('[data-period-selector] button:has-text("Full year")').first().click({ force: true });
+await periodTitle.click();
+await page.waitForTimeout(400);
+await periodSheet.locator('.nfm-period-seg button:text-is("Full year")').click();
 await page.waitForTimeout(800);
 const yearPicker = page.locator('[data-nf-year-picker]').first();
 check('le mode annee propose les annees', await yearPicker.count() === 1);
+check('le titre dit l annee', await titleText() === 'Year 2026', await titleText());
 if (await yearPicker.count()) {
   check('il affiche l annee active', await yearPicker.inputValue() === 'nfyear:2026');
-  await Promise.all([page.waitForEvent('load'), yearPicker.selectOption('nfyear:2027')]);
+  await Promise.all([page.waitForEvent('load'), periodSheet.locator('[data-nf-period-year="2027"]').click()]);
   await page.waitForTimeout(6000);
   check('on reste en mode annee apres le changement',
     await page.locator('[data-nf-year-picker]').first().inputValue().catch(() => '') === 'nfyear:2027');
+  check('le titre dit 2027', await titleText() === 'Year 2027', await titleText());
 }
 
 // ── 9 · Decision de la finance sur le mois ───────────────────────────
