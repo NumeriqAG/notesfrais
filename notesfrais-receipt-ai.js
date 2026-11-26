@@ -121,6 +121,14 @@ async function nfReadReceiptWithAI(file){
 }
 function AddModal({onClose,onAdd,month}){`);
 
+    // Retirer la photo ou repartir sur un frais vierge rend caduque toute
+    // lecture encore en cours : sa reponse ne doit plus remplir le formulaire.
+    const nfDrop='window.NOTESFRAIS_OCR_SEQ=(window.NOTESFRAIS_OCR_SEQ||0)+1;';
+    const removeBtn='onClick={()=>{setFile(null);setPreview(null);setOcrStatus(null);setOcrProgress(0);}}';
+    if(!html.includes(removeBtn)) throw new Error('receipt-ai: cible introuvable (remove receipt)');
+    html = html.split(removeBtn).join('onClick={()=>{'+nfDrop+'setFile(null);setPreview(null);setOcrStatus(null);setOcrProgress(0);}}');
+    rep('reset', 'const nfmReset=()=>{setFile(null);', 'const nfmReset=()=>{'+nfDrop+'setFile(null);');
+
     return html;
   };
 })();
