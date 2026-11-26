@@ -538,8 +538,8 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
   justificatif**, un email en anglais « Your expense has been saved » part vers
   `RECEIPT_BACKUP_EMAIL` (défaut : l'email de la session) : date, commerçant,
   montant et devise, montant CHF et sa source, TVA, catégorie, carte, « With »,
-  note, référence, heure d'enregistrement, et **tous les justificatifs en une
-  seule pièce jointe** (au-delà de 18 Mo, les fichiers restants sont cités, pas
+  note, référence, heure d'enregistrement, et **tous les justificatifs joints à un
+  seul email** (au-delà de 18 Mo, les fichiers restants sont cités, pas
   joints). Un justificatif ajouté plus tard envoie « Receipt added » avec le seul
   nouveau fichier ; toute autre modification n'envoie rien. Carte et « With »
   sont relus dans la note (`parseNote`). Préprod : seulement si
