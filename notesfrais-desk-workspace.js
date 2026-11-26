@@ -2,7 +2,7 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(html.includes('NOTESFRAIS_DESK_WORKSPACE_V2')) return html;
+    if(html.includes('NOTESFRAIS_DESK_WORKSPACE_V3')) return html;
 
     // Une vraie version ordinateur pour Mike (nov. 2026).
     //
@@ -51,7 +51,7 @@
 
     // ── 1. Les composants ──────────────────────────────────────────────────
     rep('App', '\nfunction App(){', String.raw`
-// NOTESFRAIS_DESK_WORKSPACE_V2 : l'espace de travail de Mike sur ordinateur.
+// NOTESFRAIS_DESK_WORKSPACE_V3 : l'espace de travail de Mike sur ordinateur.
 const NF_WS_TINT={repas:['#E5F3EA','#17663F'],transport:['#E6F1FA','#0F5E92'],hotel:['#FDF0E3','#A04A06'],materiel:['#EEEAF7','#5B4B8A'],autre:['#EEF1F4','#5B6875']};
 function NfWsIcon({name,size=18}){
   const P={
@@ -326,7 +326,7 @@ function NfDeskWorkspace(p){
       </button>
       <div className="nfw-kpi">
         <span className="nfw-k">Status</span>
-        <span className="nfw-v">{monthMode?<NfMonthReviewPill state={state}/>:<span className="nfw-s">Choose a month</span>}</span>
+        <span className="nfw-v nfw-v-pill">{monthMode?<NfMonthReviewPill state={state}/>:<span className="nfw-s">Choose a month</span>}</span>
         <span className="nfw-s">{!monthMode?'to submit it':state==='open'?(!mE.length?'Nothing to submit yet':missing?'Receipts missing':'Ready to submit'):state==='submitted'?'Finance is checking it':state==='sent_back'?'Fix, then submit again':state==='approved'?'To be reimbursed':'Paid back'}</span>
       </div>
     </div>
@@ -443,12 +443,16 @@ function App(){`);
     // conteneur racine de l'App, qui perdait son display:flex (barre en haut,
     // contenu dessous, et ainsi jusqu'au rechargement). Thomas, 26 nov. 2026.
     // Le script ne touche plus jamais un bloc qui contient la barre laterale.
+    // Et sur ordinateur il ne remet plus display:'' : le pied de la barre (une
+    // grille avec gap:8) perdait sa grille et « + Add expense » touchait
+    // « Import statement », chez Mike comme a la finance. Il ne restaure
+    // desormais que ce qu'il a lui-meme masque.
     rep('mobile-cleanup', "  if(!block)return;\n  block.style.display=isMobile()?'none':'';",
-      "  if(!block||block.querySelector('[data-nf-side]'))return;\n  block.style.display=isMobile()?'none':'';");
+      "  if(!block||block.querySelector('[data-nf-side]'))return;\n  if(isMobile()){if(block.style.display!=='none'){block.dataset.nfDisp=block.style.display;block.style.display='none';}}\n  else if(block.style.display==='none')block.style.display=block.dataset.nfDisp||'';");
 
     // ── 5. Styles ──────────────────────────────────────────────────────────
     const css = `<style id="nf-ws-css">
-/* NOTESFRAIS_DESK_WORKSPACE_V2 */
+/* NOTESFRAIS_DESK_WORKSPACE_V3 */
 body.nf-desk-wide button[title="Change access"]{display:none!important}
 body.nf-desk-wide #numeriq-brand-card{display:none!important}
 body.nf-desk-wide [data-nf-side]{width:236px!important;background:#FBFCFD!important}
@@ -505,6 +509,7 @@ body.nf-desk-user [data-nf-main]>[data-nf-ws].nfw{max-width:none!important;margi
 .nfw-kpi-on{background:#FDF6EE}
 .nfw-k{font-size:12px;color:#5B6875;font-weight:500}
 .nfw-v{font-size:17px;font-weight:650;color:#1E2B38;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.nfw-v-pill{overflow:visible;display:flex;align-items:center;min-height:24px;padding:1px 0}
 .nfw-v-big{font-size:22px;font-weight:700;letter-spacing:-.01em}
 .nfw-s{font-size:12px;color:#6B7785;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .nfw-warn{color:#A04A06;font-weight:600}
