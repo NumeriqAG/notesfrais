@@ -131,11 +131,13 @@ page.on('pageerror', e => errors.push(String(e).split('\n')[0].slice(0, 200)));
 
 // Tesseract n'est de toute facon pas joignable ici : on coupe net pour que la
 // branche d'echec s'exerce tout de suite au lieu d'attendre le timeout de 90 s.
-await page.route('**/tesseract*', route => route.abort());
+let tesseractHits = 0;
+await page.route('**/tesseract*', route => { tesseractHits++; return route.abort(); });
 
 // Etat simule de /api/month-review et role de la session : la section 9
 // rejoue la decision de la finance, puis ce que Mike en voit.
 let role = 'user';
+let aiMode = 'off';
 const reviews = {};
 
 const apiHandler = async route => {
@@ -169,6 +171,14 @@ const apiHandler = async route => {
     return json({ ok: true, month, action, review: reviews[month] || null });
   }
   if (url.pathname === '/api/receipts') return json({ ok: true, url: 'about:blank' });
+  // Lecture par IA : d'abord sans cle (503, l'app retombe sur Tesseract),
+  // puis avec une reponse type pour verifier le remplissage du formulaire.
+  if (url.pathname === '/api/receipt-ai') {
+    if (aiMode === 'ok') return json({ ok: true, fields: { is_receipt: true, merchant: 'Taxi Bleu Paris',
+      total: 48.6, vat: 4.42, currency: 'EUR', date: '2026-08-18', category: 'transport' } });
+    return route.fulfill({ status: 503, contentType: 'application/json',
+      body: JSON.stringify({ ok: false, error: 'AI reading is not configured (ANTHROPIC_API_KEY missing)' }) });
+  }
   if (url.pathname === '/api/expense-comments') {
     const row = rows.find(r => r.id === Number(body && body.expense_id));
     if (!row) return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'Expense not found' }) });
@@ -203,6 +213,7 @@ await page.route('**/api/**', apiHandler);
 
 // ── Assertions ────────────────────────────────────────────────────────
 let pass = 0, fail = 0;
+let mark = 0;
 const check = (label, ok, detail = '') => {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}${detail && !ok ? ' — ' + detail : ''}`);
   ok ? pass++ : fail++;
@@ -313,6 +324,45 @@ check('il sonde le worker blob:', /blob worker (OK|BLOCKED)/.test(amber),
 check('il donne le build', /build \d{4}-\d{2}-\d{2}/.test(amber),
   amber.replace(/\s+/g, ' ').slice(0, 140));
 await shot('01b-capture-diagnostic');
+// L'IA a ete tentee avant Tesseract, et le diagnostic dit pourquoi elle n'a
+// pas servi : sans cle, « AI reading is not configured ».
+check('l IA est tentee avant Tesseract',
+  calls.some(c => c.method === 'POST' && c.path === '/api/receipt-ai'));
+check('le diagnostic dit pourquoi l IA n a pas servi', /AI: AI reading is not configured/.test(amber),
+  amber.replace(/\s+/g, ' ').slice(0, 160));
+
+// ── 2b · Lecture par IA ───────────────────────────────────────────────
+console.log('\n2b. Lecture par IA');
+aiMode = 'ok';
+const tessBefore = tesseractHits;
+const dateBefore = await page.locator('[data-nfm-capture] input[type=date]').inputValue();
+mark = calls.length;
+await page.setInputFiles('[data-nfm-capture] input[type=file]', {
+  name: 'ticket-taxi.png', mimeType: 'image/png',
+  buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+});
+await page.waitForTimeout(2500);
+const aiCall = since(mark).find(c => c.method === 'POST' && c.path === '/api/receipt-ai');
+check('la photo part a l IA', !!aiCall);
+check('elle part en base64 avec son type', aiCall && aiCall.body && /^[A-Za-z0-9+/]+=*$/.test(aiCall.body.data || '')
+  && /^image\//.test(aiCall.body.media_type || ''), aiCall && aiCall.body && aiCall.body.media_type);
+check('Tesseract n est pas lance quand l IA a lu', tesseractHits === tessBefore, `${tesseractHits - tessBefore} requete(s)`);
+const aiLabel = await page.locator('.nfm-ocr-l').innerText();
+check('la lecture est annoncee reussie', /^Read/.test(aiLabel), aiLabel);
+check('le commercant est rempli',
+  await page.locator('.nfm-row input[placeholder="Not filled yet"]').inputValue() === 'Taxi Bleu Paris');
+check('le total est rempli', await page.locator('.nfm-row input.nfm-amount').inputValue() === '48.60');
+check('la TVA est remplie', await page.locator('.nfm-row input.nfm-vat').inputValue() === '4.42');
+check('la devise est reprise', await page.locator('.nfm-row select.nfm-cur').inputValue() === 'EUR');
+check('la date est reprise',
+  await page.locator('[data-nfm-capture] input[type=date]').inputValue() === '2026-08-18');
+const catSelect = page.locator('.nfm-row:has(label:text-is("Category")) select');
+check('la categorie est reprise', await catSelect.inputValue() === 'transport');
+await shot('01c-lecture-ia');
+// Retour a l'etat attendu par la suite du parcours.
+await page.locator('.nfm-row select.nfm-cur').selectOption('CHF');
+await catSelect.selectOption('repas');
+await page.locator('[data-nfm-capture] input[type=date]').fill(dateBefore);
 
 // ── 3 · Enregistrer ───────────────────────────────────────────────────
 console.log('\n3. Enregistrer un frais');
@@ -330,7 +380,7 @@ check('Save devient actif une fois la carte choisie',
   !(await page.locator('.nfm-sheet-bar button.nfm-strong').isDisabled()));
 check('l erreur disparait', await page.locator('.nfm-err').count() === 0);
 
-let mark = calls.length;
+mark = calls.length;
 await page.locator('.nfm-btn-quiet:has-text("Save and add another")').click();
 await page.waitForTimeout(3000);
 const posted = since(mark).filter(c => c.method === 'POST' && c.path === '/api/expenses');

@@ -134,6 +134,9 @@ section('3. Fonctionnalites presentes dans le HTML genere');
 const REQUIRED = {
   all: [
     ['AccessGate present', 'function AccessGate('],
+    ['lecture IA : route API', "fetch('/api/receipt-ai'"],
+    ['lecture IA : Tesseract en secours', 'return nfTesseractOCR(imgFile,note);'],
+    ['lecture IA : PDF lu', "setPreview('pdf');runOCR(prepared);"],
     ['decision du mois : route API', '/api/month-review'],
     ['decision du mois : bloc finance', 'function NfFinanceMonthDecision('],
     ['decision du mois : bandeau utilisateur', '<NfUserMonthReviewBanner review={nfMonthReviews[month]||null}'],

@@ -6,6 +6,7 @@
     "seed:backup": "node scripts/seed-backup.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
     "@aws-sdk/client-s3": "^3.940.0",
     "@aws-sdk/s3-request-presigner": "^3.940.0",
     "@neondatabase/serverless": "^1.0.2",

@@ -75,6 +75,7 @@ base côté client. Le front parle à des routes serverless :
 | `GET/POST /api/month-review` | **Décision de la finance sur un mois soumis** : approuver, renvoyer (rouvre le mois), marquer remboursé, annuler. Finance seule en écriture ; un `user` ne lit que son canal. Table `month_reviews`. |
 | `GET/POST/DELETE /api/push-subscription` | Clé VAPID publique, abonnement Web Push de l'iPhone (compte `user` seulement, canal forcé depuis la session). |
 | `GET /api/cron/monthly-reminder` | **Rappel de fin de mois** à l'utilisateur (email + push), lancé chaque jour par Vercel Cron. Protégé par `CRON_SECRET`. |
+| `POST /api/receipt-ai` | **Lecture d'un reçu par IA** : la photo (ou le PDF) part à l'API Claude, qui renvoie commerçant, total, TVA, devise, date et catégorie en JSON contraint par un schéma. Rien n'est stocké. Toute session valide. Sans `ANTHROPIC_API_KEY`, répond 503 et l'app lit avec Tesseract. |
 | `POST /api/notify-submission` | Email de notification simple. Probablement supplanté par la route ci-dessus — à vérifier avant de s'en servir. |
 
 ### Les deux canaux
@@ -164,7 +165,7 @@ valide le **comportement**. Il ouvre l'app dans Chromium avec `/api/*` simulé,
 puis **clique** : capture d'un frais, enchaînement « Save and add another »,
 import d'un CSV UBS, suppression avec confirmation, soumission du mois,
 modification d'un frais, passage en janvier 2027 et retour sur décembre 2026.
-109 assertions par canal, dont les commentaires (section 6b), la décision de la finance (section 9) et ce que Mike en voit (section 10),
+121 assertions par canal, dont la lecture par IA et son repli sur Tesseract (sections 2 et 2b), les commentaires (section 6b), la décision de la finance (section 9) et ce que Mike en voit (section 10),
 plus un journal des appels API qui prouve qu'un clic a bien agi.
 
 **L'horloge du navigateur est fixée** (`page.clock.install`) au 20 août 2026,
@@ -343,6 +344,7 @@ l'époque Supabase et continuent de tourner grâce au shim.
 | 51 | `statement.js` | **Relevé de carte ou de banque** : lit les CSV (UBS e-banking, carte UBS, Swisscard, format de l'app), les PDF texte (pdf.js) et les PDF **scannés** (OCR Tesseract page par page). Les cartes de Mike sont Swisscard (Amex + Mastercard), relevé papier du 15 au 14. Rapprochement `nfReconcile` par appariement global : montant (devise d'origine comprise), date ±4 jours, similarité de libellé. Il porte sur **toute la période du relevé**, pas seulement le mois affiché, et ne touche pas un mois soumis côté employé. Un frais en devise rapproché prend le montant réellement débité (`fx_source 'card'`). Bouton « Link » sur une ligne sans reçu proche d'un frais. Le PDF réel de Mike ne va jamais dans le dépôt. Chaque cible manquante lève une erreur. |
 | 52 | `currency.js` | **Devise à la saisie** (CHF par défaut, détectée par l'OCR), montant d'origine sous le CHF dans les listes, onglet finance **« Currencies »** (`NfFxTab`) : sources du CHF (estimation BCE, relevé, finance, cours manquant), correction du cours ou du montant CHF. Côté serveur, `api/_lib/fx.js` estime au cours BCE (Frankfurter, table `fx_rates`) ; une estimation ne remplace jamais une valeur `card` ou `manual`, sauf si montant, devise ou date changent. La TVA récupérable exclut les frais en devise. |
 | 53 | `session.js` | **Session expirée** : un 401 affiche « You are signed out » (et non « Offline ») ; le frais reste dans la file et part après reconnexion. Ping de `/api/session` au retour sur l'app. La resynchro hors ligne ne tourne qu'une fois à la fois (sinon doublons). Côté serveur, `refreshSession` prolonge le cookie (au plus une fois par heure) : la session est glissante. |
+| 54 | `receipt-ai.js` | **Lecture des reçus par IA** (nov. 2026, Tesseract lisait trop mal). `runOCR` envoie d'abord la photo à `/api/receipt-ai` ; l'ancien `runOCR` devient `nfTesseractOCR`, le **secours** : hors ligne, sans clé, ou si la route échoue. Le diagnostic commence alors par « AI: <raison> ». Les PDF sont lus aussi (Tesseract ne les lisait pas). La catégorie est remplie. Une réponse arrivée après le choix d'une autre photo est ignorée (`NOTESFRAIS_OCR_SEQ`). Chargé avant `dark.js`, en anglais ; chaque cible manquante lève une erreur. |
 
 ---
 
@@ -513,6 +515,13 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
   `CRON_SECRET`, la route refuse tout.** Les lignes du relevé UBS ne sont pas
   stockées côté serveur : le rappel ne peut pas encore citer les paiements UBS
   sans reçu.
+- **Lecture des reçus par IA.** La photo du reçu (ou le PDF) part à
+  Anthropic via `/api/receipt-ai` au moment de la saisie : c'est le seul
+  endroit où un justificatif quitte Vercel/R2 pour un tiers. Modèle par défaut
+  `claude-opus-5-5` (effort `low`, environ 2 à 3 centimes par reçu),
+  `RECEIPT_AI_MODEL=claude-haiku-5-5` pour beaucoup moins cher. Repli serveur
+  sur refus (`fallbacks: 'default'`) pour les modèles qui l'acceptent. Choix de
+  Thomas, nov. 2026 : Tesseract lisait trop mal.
 - **Copie des reçus par email.** À chaque frais créé avec justificatif, un email
   part vers `RECEIPT_BACKUP_EMAIL` (défaut : l'email de la session).
 - **Offline.** IndexedDB `notesfrais-offline-v1`, fichier sérialisé en data-URL
@@ -532,7 +541,7 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
 `SUBMISSION_MAIL_FROM` · `USER_NOTIFICATION_EMAIL` · `USER_NOTIFICATION_TEST_EMAIL` ·
 `USER_NOTIFICATION_FROM` · `APP_BASE_URL` · `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` ·
 `VAPID_SUBJECT` (paire générée par `node scripts/generate-vapid-keys.mjs`) ·
-`CRON_SECRET` · `MONTHLY_REMINDER_CHANNELS`. Modèle
+`CRON_SECRET` · `MONTHLY_REMINDER_CHANNELS` · `ANTHROPIC_API_KEY` (lecture des reçus par IA ; sans elle, Tesseract) · `RECEIPT_AI_MODEL` (défaut `claude-opus-5-5`). Modèle
 complet dans `.env.example`.
 
 ---
