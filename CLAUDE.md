@@ -158,6 +158,7 @@ Le seul filet de sécurité du dépôt. Il vérifie :
 ```bash
 node tools/e2e-mobile.mjs mike
 node tools/e2e-mobile.mjs test
+node tools/e2e-desktop.mjs mike   # Mike sur ordinateur : import de plusieurs reçus
 ```
 
 Les deux outils ci-dessus valident la **syntaxe** du HTML produit ; celui-ci
@@ -346,6 +347,7 @@ l'époque Supabase et continuent de tourner grâce au shim.
 | 53 | `session.js` | **Session expirée** : un 401 affiche « You are signed out » (et non « Offline ») ; le frais reste dans la file et part après reconnexion. Ping de `/api/session` au retour sur l'app. La resynchro hors ligne ne tourne qu'une fois à la fois (sinon doublons). Côté serveur, `refreshSession` prolonge le cookie (au plus une fois par heure) : la session est glissante. |
 | 54 | `receipt-ai.js` | **Lecture des reçus par IA** (nov. 2026, Tesseract lisait trop mal). `runOCR` envoie d'abord la photo à `/api/receipt-ai` ; l'ancien `runOCR` devient `nfTesseractOCR`, le **secours** : hors ligne, sans clé, ou si la route échoue. Le diagnostic commence alors par « AI: <raison> ». Les PDF sont lus aussi (Tesseract ne les lisait pas). La catégorie est remplie. Une réponse arrivée après le choix d'une autre photo est ignorée (`NOTESFRAIS_OCR_SEQ`). Chargé avant `dark.js`, en anglais ; chaque cible manquante lève une erreur. |
 | 55 | `period-compact.js` | **Sélecteur de période compact** (dernier élément de la maquette, nov. 2026) : sur l'iPhone de Mike, le grand titre de l'en-tête EST la période (« August 2026 ⌄ », « Jun – Aug 2026 », « Year 2026 »). Le toucher ouvre `NfPeriodSheet` (portée sur `<body>`) : Month / Range / Full year, grille des 12 mois avec leur nombre de frais, années précédentes (rechargement via `nfSwitchYear`). L'ancien sélecteur reste dans le DOM, **masqué** : `year.js` et les tests lisent encore sa valeur. Le titre est écrit par `window.nfPeriodHeaderSync`, appelé par le tick de `mobile-redesign.js`. Chargé avant `dark.js`. Chaque cible manquante lève une erreur. |
+| 56 | `desktop.js` | **Mike sur ordinateur** (nov. 2026 : beaucoup de reçus électroniques, PDF par email ou portails). Écran ≥ 860 px et compte `user` seulement (`body.nf-desk-user`) ; la finance ne change pas. Panneau « Add receipts from your computer » (choix de plusieurs fichiers) et dépôt de fichiers **n'importe où sur la page** (voile `NfDeskDrop`). Les fichiers forment une **file** dans la fenêtre d'ajout existante : lecture IA du premier, Mike vérifie et confirme, le suivant s'ouvre seul (« Receipt 2 of 5 », « Skip this one »), carte de paiement conservée. Aperçu du justificatif (PDF en iframe `blob:`, image) à côté du formulaire. Carte du mois mise en forme sur grand écran. La fenêtre porte `role="dialog"` pour que le panneau « Local queue » s'efface devant elle. Chargé avant `dark.js` ; chaque cible manquante lève une erreur. Testé par `tools/e2e-desktop.mjs`. |
 
 ---
 

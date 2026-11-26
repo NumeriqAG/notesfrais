@@ -134,6 +134,10 @@ section('3. Fonctionnalites presentes dans le HTML genere');
 const REQUIRED = {
   all: [
     ['AccessGate present', 'function AccessGate('],
+    ['ordinateur : depot de plusieurs recus', '<NfDeskDrop onOpen={()=>setShowAdd(true)}/>'],
+    ['ordinateur : panneau d import', '<NfDeskImport onOpen={()=>setShowAdd(true)}/>'],
+    ['ordinateur : file de recus enchainee', 'else if(!nfDeskNext(form.merchant)){onClose();}'],
+    ['ordinateur : apercu du justificatif', 'data-nf-desk-preview="true"'],
     ['lecture IA : route API', "fetch('/api/receipt-ai'"],
     ['periode compacte : feuille de choix', 'function NfPeriodSheet('],
     ['periode compacte : montee dans l App', '<NfPeriodSheet tab={tab}'],
