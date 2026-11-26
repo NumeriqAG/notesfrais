@@ -78,7 +78,8 @@ async function createExpense(req, res, session) {
   const receiptEmail = await sendReceiptBackupEmails({
     session,
     expense: row,
-    receiptItems: receiptItemsFromRow(row)
+    receiptItems: receiptItemsFromRow(row),
+    kind: 'created'
   });
   return sendJson(res, 201, { ok: true, data: row, receiptEmail });
 }
@@ -143,7 +144,8 @@ async function updateExpenses(req, res, session) {
       receiptEmailResults.push(await sendReceiptBackupEmails({
         session,
         expense: row,
-        receiptItems: newItems
+        receiptItems: newItems,
+        kind: 'receipt_added'
       }));
     }
   }
