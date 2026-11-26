@@ -422,6 +422,44 @@ for (const [w, h, name] of [[1900, 945, '01d-1900'], [1366, 657, '01e-1366']]) {
 await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForTimeout(900);
 
+// ── 1c · Les onglets Stats et UBS statement, et le retour ─────────────
+// Thomas, 26 nov. 2026 : apres l'onglet UBS, la barre laterale remontait
+// en haut a gauche et le contenu passait dessous, meme de retour sur Expenses.
+console.log('\n1c. Onglets Stats et UBS statement, allers-retours (1900 px)');
+await page.setViewportSize({ width: 1900, height: 945 });
+await page.waitForTimeout(900);
+const layout = async () => page.evaluate(() => {
+  const side = document.querySelector('[data-nf-side]'), main = document.querySelector('[data-nf-main]');
+  const s = side.getBoundingClientRect(), m = main.getBoundingClientRect(), root = side.parentElement, cs = getComputedStyle(root);
+  return { sideL: Math.round(s.left), sideT: Math.round(s.top), sideW: Math.round(s.width), sideH: Math.round(s.height),
+           mainL: Math.round(m.left), mainT: Math.round(m.top), mainW: Math.round(m.width), vh: innerHeight, vw: innerWidth,
+           rootDir: cs.flexDirection, rootDisplay: cs.display, rootPos: cs.position,
+           sidePos: getComputedStyle(side).position, sideStyle: side.getAttribute('style'), rootStyle: root.getAttribute('style'),
+           pageScroll: document.scrollingElement.scrollHeight > innerHeight + 2 };
+});
+const sideOk = l => l.sideL === 0 && l.sideT === 0 && l.sideW >= 220 && l.sideW <= 240 && l.sideH === l.vh
+  && l.mainL === l.sideW && l.mainT === 0 && l.mainW === l.vw - l.sideW && !l.pageScroll;
+const goTab = async label => { await page.locator(`[data-nf-side] button:has-text("${label}")`).first().click(); await page.waitForTimeout(900); };
+let lay = await layout();
+check('Expenses : barre a gauche sur toute la hauteur', sideOk(lay), JSON.stringify(lay));
+for (const [label, name] of [['UBS statement', '01h-ubs'], ['Expenses', '01i-retour-expenses'], ['Stats', '01j-stats'], ['Expenses', '01k-retour-expenses'], ['UBS statement', '01l-ubs-2'], ['Stats', '01m-stats-2'], ['Expenses', '01n-retour-final']]) {
+  await goTab(label);
+  lay = await layout();
+  check(label + ' : barre a gauche sur toute la hauteur, contenu a droite', sideOk(lay), JSON.stringify(lay));
+  if (label === 'Expenses') check(label + ' : espace de travail de retour', await page.locator('[data-nf-ws]').isVisible() && (await page.locator('[data-nf-ws]').boundingBox()).x === lay.sideW);
+  await shot(name);
+}
+await page.setViewportSize({ width: 1366, height: 657 });
+await page.waitForTimeout(900);
+for (const label of ['UBS statement', 'Stats', 'Expenses']) {
+  await goTab(label);
+  lay = await layout();
+  check('1366 px, ' + label + ' : barre a gauche, contenu a droite', sideOk(lay), JSON.stringify(lay));
+}
+await shot('01o-1366-retour');
+await page.setViewportSize({ width: 1440, height: 900 });
+await page.waitForTimeout(900);
+
 // Entre 860 et 1100 px, l'ancienne mise en page ordinateur reste.
 console.log('\n1b. Ecran moyen (1000 px) : mise en page ordinateur d avant');
 await page.setViewportSize({ width: 1000, height: 800 });
