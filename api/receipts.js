@@ -1,5 +1,5 @@
 const { sendJson, readJson, methodNotAllowed, getQuery } = require('./_lib/http');
-const { requireSession } = require('./_lib/auth');
+const { requireSession, refreshSession } = require('./_lib/auth');
 const { sql, normalizeReceiptItems } = require('./_lib/db');
 const { keyForUpload, uploadObject, deleteObject, getObject, signedUrl } = require('./_lib/r2');
 
@@ -9,6 +9,7 @@ const ALLOWED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png', 'ima
 module.exports = async function handler(req, res) {
   try {
     const session = requireSession(req);
+    refreshSession(req, res, session);
     if (req.method === 'GET') return getReceipt(req, res, session);
     if (req.method === 'POST') return uploadReceipt(req, res, session);
     if (req.method === 'DELETE') return removeReceipt(req, res, session);

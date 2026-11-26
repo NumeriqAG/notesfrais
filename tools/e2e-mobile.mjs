@@ -420,7 +420,7 @@ check('la carte du mois resume le rapprochement UBS',
   await ubsCell.innerText().catch(() => 'cellule absente'));
 await ubsCell.click({ force: true });
 await page.waitForTimeout(900);
-check('elle ouvre l import UBS', await page.locator('text=Drop your UBS CSV here').count() >= 1);
+check('elle ouvre l import UBS', await page.locator('text=Drop your statement here').count() >= 1);
 await page.keyboard.press('Escape');
 await page.locator('button').filter({ hasText: /^(Cancel|Close|×|✕)$/ }).first().click({ force: true, timeout: 1500 }).catch(() => {});
 await page.waitForTimeout(600);

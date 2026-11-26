@@ -7,13 +7,28 @@ const {
   serializeCookie,
   checkLoginRateLimit,
   recordLoginFailure,
-  clearLoginFailures
+  clearLoginFailures,
+  currentProfile
 } = require('./_lib/auth');
 
 module.exports = async function handler(req, res) {
   try {
     if (req.method === 'GET') {
-      const session = readSession(req);
+      let session = readSession(req);
+      // Session glissante : l'app lit sa session a chaque ouverture, on en
+      // profite pour la prolonger de 14 jours. Mike n'est donc deconnecte
+      // qu'apres 14 jours SANS ouvrir l'app, et non 14 jours apres sa
+      // connexion. Un compte retire ou modifie dans la configuration perd sa
+      // session a la prochaine ouverture.
+      if (session) {
+        const profile = currentProfile(session);
+        if (profile) {
+          res.setHeader('Set-Cookie', serializeCookie(makeSession(profile)));
+        } else {
+          res.setHeader('Set-Cookie', clearCookie());
+          session = null;
+        }
+      }
       return sendJson(res, 200, {
         ok: true,
         session: session ? { user: { id: session.id, email: session.email } } : null,

@@ -18,6 +18,12 @@ async function ensureSchema() {
       // (« a corriger »). Voir api/expense-comments.js.
       await db`alter table expenses add column if not exists comments jsonb not null default '[]'::jsonb`;
       await db`alter table expenses add column if not exists review_status text not null default 'ok'`;
+      // Devise etrangere : cours applique, son origine ('ecb' estimation,
+      // 'card' releve de carte, 'manual' finance, 'missing' pas de cours) et
+      // le jour du cours. Voir api/_lib/fx.js.
+      await db`alter table expenses add column if not exists fx_rate numeric`;
+      await db`alter table expenses add column if not exists fx_source text`;
+      await db`alter table expenses add column if not exists fx_date date`;
     })();
     // Un echec (reseau, droits) ne doit pas rester en cache pour toute la vie
     // de l'instance : on retentera a la requete suivante.
