@@ -2,7 +2,7 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(html.includes('NOTESFRAIS_DESK_WORKSPACE_V1')) return html;
+    if(html.includes('NOTESFRAIS_DESK_WORKSPACE_V2')) return html;
 
     // Une vraie version ordinateur pour Mike (nov. 2026).
     //
@@ -51,7 +51,7 @@
 
     // ── 1. Les composants ──────────────────────────────────────────────────
     rep('App', '\nfunction App(){', String.raw`
-// NOTESFRAIS_DESK_WORKSPACE_V1 : l'espace de travail de Mike sur ordinateur.
+// NOTESFRAIS_DESK_WORKSPACE_V2 : l'espace de travail de Mike sur ordinateur.
 const NF_WS_TINT={repas:['#E5F3EA','#17663F'],transport:['#E6F1FA','#0F5E92'],hotel:['#FDF0E3','#A04A06'],materiel:['#EEEAF7','#5B4B8A'],autre:['#EEF1F4','#5B6875']};
 function NfWsIcon({name,size=18}){
   const P={
@@ -436,9 +436,19 @@ function App(){`);
     rep('pied laterale', "{ubsLoaded?'✓ UBS loaded':'🏦 Import UBS statement'}</button></div>",
       "{nfDeskWide?<span className=\"nfw-side-btn\"><NfWsIcon name=\"recon\" size={15}/>{ubsLoaded?'Statement loaded':'Import statement'}</span>:(ubsLoaded?'✓ UBS loaded':'🏦 Import UBS statement')}</button>{nfDeskWide&&<button type=\"button\" className=\"nfw-side-out\" onClick={()=>{const b=document.querySelector('button[title=\"Change access\"]');if(b)b.click();}}><NfWsIcon name=\"logout\" size={15}/>Sign out</button>}</div>");
 
+    // mobile-cleanup.js (patch 26) remonte du bouton « + Add expense » jusqu'au
+    // premier parent qui contient « Import UBS statement », puis lui remet
+    // style.display='' a chaque clic. Le pied de la barre ne porte plus ce
+    // texte sur grand ecran : sur l'onglet UBS, le parent trouve etait le
+    // conteneur racine de l'App, qui perdait son display:flex (barre en haut,
+    // contenu dessous, et ainsi jusqu'au rechargement). Thomas, 26 nov. 2026.
+    // Le script ne touche plus jamais un bloc qui contient la barre laterale.
+    rep('mobile-cleanup', "  if(!block)return;\n  block.style.display=isMobile()?'none':'';",
+      "  if(!block||block.querySelector('[data-nf-side]'))return;\n  block.style.display=isMobile()?'none':'';");
+
     // ── 5. Styles ──────────────────────────────────────────────────────────
     const css = `<style id="nf-ws-css">
-/* NOTESFRAIS_DESK_WORKSPACE_V1 */
+/* NOTESFRAIS_DESK_WORKSPACE_V2 */
 body.nf-desk-wide button[title="Change access"]{display:none!important}
 body.nf-desk-wide #numeriq-brand-card{display:none!important}
 body.nf-desk-wide [data-nf-side]{width:236px!important;background:#FBFCFD!important}
