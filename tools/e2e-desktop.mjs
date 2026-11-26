@@ -28,7 +28,7 @@
  * celle qui doit rester rattrapable a la main.
  */
 import { chromium } from 'playwright';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
@@ -72,6 +72,12 @@ if (existsSync('.patch-out/vendor/inter-latin.woff2')) {
 }
 writeFileSync('.patch-out/e2e-desktop.html', html);
 
+// Recus de test (synthetiques) : versionnes dans tools/fixtures, copies dans
+// .patch-out/fx que le petit serveur sert aussi (URL signee simulee).
+const FX = '.patch-out/fx';
+mkdirSync(FX, { recursive: true });
+for (const f of ['swiss-eticket.pdf', 'hotel-invoice.pdf', 'taxi.jpg']) copyFileSync(`tools/fixtures/${f}`, `${FX}/${f}`);
+
 const today = '2026-08';
 const expense = (id, day, merchant, amount, cat, status, note = '') => ({
   id, date: `${today}-${String(day).padStart(2, '0')}`, merchant,
@@ -96,16 +102,28 @@ rows[2].comments = [
   { id: 'c1', at: `${today}-15T09:00:00.000Z`, role: 'finance', email: 'finance@numeriq.ch', kind: 'status', review_status: 'to_fix' },
   { id: 'c2', at: `${today}-15T09:00:00.000Z`, role: 'finance', email: 'finance@numeriq.ch', kind: 'comment', body: 'Was this a client visit? Please add the client name in the note.' }
 ];
+// Justificatifs : une photo (brasserie), un PDF (billet CFF), deux pieces
+// (Coop : photo + PDF). L'hotel n'en a pas : c'est le frais « No receipt ».
+const receipt = (row, items) => {
+  row.receipt_items = items.map(([path, name]) => ({ path, name }));
+  row.receipt_url = items[0][0]; row.receipt_name = items[0][1];
+};
+receipt(rows[0], [[`${channel}/1_brasserie.jpg`, 'brasserie.jpg']]);
+receipt(rows[1], [[`${channel}/2_sbb.pdf`, 'sbb-ticket.pdf']]);
+receipt(rows[3], [[`${channel}/4_coop.jpg`, 'coop.jpg'], [`${channel}/4_coop-2.pdf`, 'coop-invoice.pdf']]);
+// Un frais en euros, pour la colonne du montant d'origine.
+rows[0].currency = 'EUR'; rows[0].amount = 70; rows[0].amount_chf = 67.2;
 
 // Journal des appels API : c'est la preuve qu'un clic a bien agi.
 const calls = [];
+const receiptReads = [];
 let nextId = 100;
 
 // Servi en http://127.0.0.1 et non plus en file:// : les Chromium recents
 // refusent fetch('/api/...') sous file:// (« URL scheme "file" is not
 // supported ») avant meme que page.route() puisse l'intercepter, et l'app
 // restait bloquee sur l'ecran de connexion.
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.woff2': 'font/woff2', '.png': 'image/png' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.woff2': 'font/woff2', '.png': 'image/png', '.jpg': 'image/jpeg', '.pdf': 'application/pdf' };
 const server = createServer((req, res) => {
   const rel = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '');
   if (rel.startsWith('..')) { res.statusCode = 403; return res.end(); }
@@ -178,7 +196,19 @@ const apiHandler = async route => {
     }
     return json({ ok: true, month, action, review: reviews[month] || null });
   }
-  if (url.pathname === '/api/receipts') return json({ ok: true, url: 'about:blank' });
+  // Justificatifs : la photo par URL signee (ici servie par le banc), le PDF
+  // par raw=1 et en blob: — la CSP de production refuse un cadre vers R2.
+  if (url.pathname === '/api/receipts') {
+    const path = url.searchParams.get('path') || '';
+    receiptReads.push({ path, raw: url.searchParams.get('raw') === '1' });
+    if (url.searchParams.get('raw') === '1') {
+      const pdf = /\.pdf$/i.test(path);
+      return route.fulfill({ status: 200, contentType: pdf ? 'application/pdf' : 'image/jpeg',
+        headers: { 'Content-Disposition': 'attachment' },
+        body: readFileSync(`${FX}/${pdf ? 'hotel-invoice.pdf' : 'taxi.jpg'}`) });
+    }
+    return json({ ok: true, signedUrl: `${BASE}/fx/${/\.pdf$/i.test(path) ? 'hotel-invoice.pdf' : 'taxi.jpg'}` });
+  }
   // Lecture par IA : d'abord sans cle (503, l'app retombe sur Tesseract),
   // puis avec une reponse type pour verifier le remplissage du formulaire.
   if (url.pathname === '/api/receipt-ai') {
@@ -238,7 +268,6 @@ const check = (label, ok, detail = '') => {
 const openDetail = async row => { await row.evaluate(el => el.click()); await page.waitForTimeout(700); };
 const shot = name => page.screenshot({ path: `${OUT}/${channel}-${name}.png` });
 
-const FX = '.patch-out/fx';
 const posts = () => calls.filter(c => c.method === 'POST' && c.path === '/api/expenses');
 const modal = () => page.locator('div[style*="position: fixed"]:has-text("Add expense")').last();
 const pickCard = async () => {
@@ -248,25 +277,135 @@ const pickCard = async () => {
 await page.goto(`${BASE}/e2e-desktop.html`, { waitUntil: 'load' });
 await page.waitForTimeout(6000);
 
-// ── 1 · L'ecran de Mike sur ordinateur ────────────────────────────────
-console.log('\n1. Ecran de Mike sur ordinateur');
+// ── 1 · L'espace de travail de Mike sur ordinateur ────────────────────
+console.log('\n1. Espace de travail sur ordinateur (1440 px)');
 check('mode ordinateur actif (body.nf-desk-user)', await page.evaluate(() => document.body.classList.contains('nf-desk-user')));
+check('grand ecran : body.nf-desk-wide', await page.evaluate(() => document.body.classList.contains('nf-desk-wide')));
 check('pas de mise en page iPhone', !(await page.evaluate(() => document.body.classList.contains('nf-ios-mike'))));
-check('panneau « Add receipts from your computer » visible', await page.locator('[data-nf-desk-import]').isVisible());
-const sumDisplay = await page.locator('[data-user-submit-placement]').evaluate(el => getComputedStyle(el).display);
-check('carte du mois mise en forme (grille)', sumDisplay === 'grid', sumDisplay);
-await shot('01-accueil');
-// Sur un grand ecran, le contenu est centre dans la zone principale (il etait colle a gauche).
-await page.setViewportSize({ width: 1900, height: 985 });
-await page.waitForTimeout(1600);
-const gaps = await page.evaluate(() => {
-  const main = document.querySelector('[data-nf-main]'), box = document.querySelector('[data-nfm-expenses]');
-  if (!main || !box) return null;
-  const m = main.getBoundingClientRect(), b = box.getBoundingClientRect();
-  return { left: Math.round(b.left - m.left), right: Math.round(m.right - b.right), width: Math.round(b.width) };
+check('espace de travail affiche', await page.locator('[data-nf-ws]').isVisible());
+check('ancienne colonne iPhone absente', await page.locator('[data-nfm-expenses]').count() === 0);
+const wsBox = async () => page.evaluate(() => {
+  const ws = document.querySelector('[data-nf-ws]'), side = document.querySelector('[data-nf-side]');
+  const r = ws.getBoundingClientRect(), s = side.getBoundingClientRect();
+  const list = document.querySelector('.nfw-list').getBoundingClientRect();
+  const det = document.querySelector('.nfw-detail').getBoundingClientRect();
+  return { left: Math.round(r.left - s.right), right: Math.round(innerWidth - r.right), height: Math.round(r.height),
+           vh: innerHeight, list: Math.round(list.width), detail: Math.round(det.width), bottom: Math.round(innerHeight - det.bottom),
+           pageScroll: document.scrollingElement.scrollHeight > innerHeight + 2 };
 });
-check('grand ecran : contenu centre', !!gaps && Math.abs(gaps.left - gaps.right) < 30 && gaps.width >= 1000, JSON.stringify(gaps));
-await shot('01b-grand-ecran');
+let box = await wsBox();
+check('toute la largeur utilisee', box.left <= 2 && box.right <= 2, JSON.stringify(box));
+check('toute la hauteur, sans defilement de page', box.height === box.vh && !box.pageScroll && box.bottom < 40, JSON.stringify(box));
+check('liste et fiche cote a cote', box.list > 450 && box.detail > 400, JSON.stringify(box));
+const rowIds = async () => page.locator('[data-nf-ws-row]').evaluateAll(els => els.map(e => e.getAttribute('data-nf-ws-row')));
+check('4 frais dans le tableau, du plus recent au plus ancien', JSON.stringify(await rowIds()) === '["4","3","2","1"]', JSON.stringify(await rowIds()));
+check('le plus recent est selectionne', (await page.locator('[data-nf-ws-detail]').getAttribute('data-nf-ws-detail')) === '4');
+await page.waitForTimeout(800);
+check('fiche : deux justificatifs, « 1 / 2 »', (await page.locator('.nfw-rc-pager').innerText().catch(() => '')).includes('1 / 2'));
+check('fiche : la photo du recu en grand', await page.locator('[data-nf-ws-receipt="image"] img').isVisible());
+await page.locator('.nfw-rc-pager button[aria-label="Next receipt"]').click();
+await page.waitForTimeout(800);
+check('2e piece : le PDF s affiche en blob:', ((await page.locator('[data-nf-ws-receipt="pdf"] iframe').getAttribute('src').catch(() => '')) || '').startsWith('blob:'));
+check('PDF lu par raw=1 (meme origine)', receiptReads.some(r => r.raw && r.path.endsWith('4_coop-2.pdf')));
+const kpi = await page.locator('.nfw-kpis').innerText();
+check('bandeau : total du mois', kpi.includes('247.80'), kpi);
+check('bandeau : justificatifs « 3 of 4 », 1 manquant', kpi.includes('3 of 4') && /1 missing/.test(kpi), kpi);
+check('bandeau : releve « 2 of 4 matched »', kpi.includes('2 of 4 matched'), kpi);
+check('soumission discrete tant qu un recu manque', await page.locator('[data-nf-ws-submit].nfw-btn-quiet').count() === 1);
+check('montant d origine sous le CHF (EUR)', (await page.locator('[data-nf-ws-row="1"] .nfw-c-amt').innerText()).includes('EUR'));
+await shot('01-espace-1440');
+
+// Clavier : fleche bas = frais suivant.
+await page.mouse.click(5, 895);
+await page.keyboard.press('ArrowDown');
+await page.waitForTimeout(400);
+check('fleche bas : frais suivant (hotel)', (await page.locator('[data-nf-ws-detail]').getAttribute('data-nf-ws-detail')) === '3');
+const hotel = await page.locator('[data-nf-ws-detail]').innerText();
+check('hotel : « No receipt attached » et bouton pour l ajouter', hotel.includes('No receipt attached') && hotel.includes('Attach a receipt'), hotel.slice(0, 200));
+check('hotel : le fil de la finance est lisible dans la fiche', hotel.includes('client visit'), hotel.slice(0, 300));
+check('hotel : pastille « To fix » dans la liste', await page.locator('[data-nf-ws-row="3"] [data-nf-to-fix]').count() === 1);
+// Un PDF seul : CFF.
+await page.locator('[data-nf-ws-row="2"]').click();
+await page.waitForTimeout(900);
+check('billet CFF : PDF en grand', await page.locator('[data-nf-ws-receipt="pdf"] iframe').count() === 1);
+check('billet CFF : rapproche du releve', (await page.locator('[data-nf-ws-detail]').innerText()).includes('Matched'));
+
+// Filtres.
+await page.locator('[data-nf-ws-flag="missing"]').click();
+await page.waitForTimeout(300);
+check('filtre « No receipt » : seulement l hotel', JSON.stringify(await rowIds()) === '["3"]', JSON.stringify(await rowIds()));
+await page.locator('[data-nf-ws-flag="all"]').click();
+await page.locator('.nfw-search input').fill('coop');
+await page.waitForTimeout(300);
+check('recherche « coop »', JSON.stringify(await rowIds()) === '["4"]', JSON.stringify(await rowIds()));
+await page.locator('.nfw-search input').fill('');
+await page.locator('.nfw-thead button:has-text("Amount"):visible').click();
+await page.waitForTimeout(300);
+check('tri par montant (du plus grand)', JSON.stringify(await rowIds()) === '["3","1","2","4"]', JSON.stringify(await rowIds()));
+await page.locator('.nfw-thead button:has-text("Date"):visible').click();
+
+// Actions de la fiche.
+await page.locator('[data-nf-ws-row="4"]').click();
+await page.waitForTimeout(500);
+await page.locator('[data-nf-ws-detail] [data-nf-act="delete"]').click();
+await page.waitForTimeout(400);
+check('Delete ouvre la confirmation', await page.locator('[data-nf-delete-confirm]').isVisible());
+await page.locator('[data-nf-delete-confirm] button:has-text("Cancel")').click();
+await page.waitForTimeout(300);
+check('Cancel : rien n est supprime', !calls.some(c => c.method === 'DELETE' && c.path === '/api/expenses') && (await rowIds()).length === 4);
+await page.locator('[data-nf-ws-detail] [data-nf-act="edit"]').click();
+await page.waitForTimeout(600);
+check('Edit ouvre la modification du frais', await page.locator('text=Coop Supermarche').count() > 1 && await page.locator('button:has-text("Cancel"), button:has-text("Close")').count() > 0);
+await page.keyboard.press('Escape');
+await page.locator('button:has-text("Cancel")').last().click().catch(() => {});
+await page.waitForTimeout(400);
+
+// Periode : le titre ouvre la feuille, les fleches changent de mois.
+await page.locator('[data-nf-ws-period]').click();
+await page.waitForTimeout(400);
+check('le titre ouvre le choix de periode', await page.locator('[data-nf-period-sheet]').isVisible());
+await shot('01b-periode');
+await page.locator('[data-nf-period-month="2026-07"]').click();
+await page.waitForTimeout(500);
+check('juillet choisi : titre « July 2026 », liste vide', (await page.locator('[data-nf-ws-period]').innerText()).includes('July 2026') && (await rowIds()).length === 0);
+check('mois vide : zone de depot a droite', await page.locator('.nfw-drop').isVisible());
+await shot('01c-mois-vide');
+await page.locator('.nfw-period-nav button[aria-label="Next month"]').click();
+await page.waitForTimeout(500);
+check('fleche : retour en aout', (await page.locator('[data-nf-ws-period]').innerText()).includes('August 2026') && (await rowIds()).length === 4);
+
+// Soumission depuis l'en-tete : le meme code que le bouton de la carte du mois.
+await page.locator('[data-nf-ws-submit]').click();
+await page.waitForTimeout(300);
+check('soumission : etapes affichees', await page.locator('.nfm-progress').isVisible().catch(() => false));
+await page.waitForTimeout(3500);
+check('soumission : POST /api/monthly-submission { month }', calls.some(c => c.method === 'POST' && c.path === '/api/monthly-submission' && c.body && c.body.month === today));
+
+// Les captures demandees par Thomas : 1900 px et 1366 px (hauteur utile du navigateur).
+for (const [w, h, name] of [[1900, 945, '01d-1900'], [1366, 657, '01e-1366']]) {
+  await page.setViewportSize({ width: w, height: h });
+  await page.waitForTimeout(900);
+  await page.locator('[data-nf-ws-row="2"]').click();
+  await page.waitForTimeout(900);
+  box = await wsBox();
+  check(w + ' px : pleine largeur, pas de defilement de page', box.left <= 2 && box.right <= 2 && !box.pageScroll, JSON.stringify(box));
+  await shot(name);
+  await page.locator('[data-nf-ws-row="3"]').click();
+  await page.waitForTimeout(500);
+  await shot(name + '-hotel');
+}
+await page.setViewportSize({ width: 1440, height: 900 });
+await page.waitForTimeout(900);
+
+// Entre 860 et 1100 px, l'ancienne mise en page ordinateur reste.
+console.log('\n1b. Ecran moyen (1000 px) : mise en page ordinateur d avant');
+await page.setViewportSize({ width: 1000, height: 800 });
+await page.waitForTimeout(1600);
+check('1000 px : pas d espace de travail', await page.locator('[data-nf-ws]').count() === 0 && !(await page.evaluate(() => document.body.classList.contains('nf-desk-wide'))));
+check('1000 px : panneau « Add receipts from your computer »', await page.locator('[data-nf-desk-import]').isVisible());
+const sumDisplay = await page.locator('[data-user-submit-placement]').evaluate(el => getComputedStyle(el).display);
+check('1000 px : carte du mois en grille', sumDisplay === 'grid', sumDisplay);
+await shot('01f-1000');
 await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForTimeout(1600);
 
