@@ -135,6 +135,9 @@ const REQUIRED = {
   all: [
     ['AccessGate present', 'function AccessGate('],
     ['lecture IA : route API', "fetch('/api/receipt-ai'"],
+    ['periode compacte : feuille de choix', 'function NfPeriodSheet('],
+    ['periode compacte : montee dans l App', '<NfPeriodSheet tab={tab}'],
+    ['periode compacte : titre de l en-tete', 'window.nfPeriodHeaderSync()'],
     ['lecture IA : Tesseract en secours', 'return nfTesseractOCR(imgFile,note);'],
     ['lecture IA : PDF lu', "setPreview('pdf');runOCR(prepared);"],
     ['decision du mois : route API', '/api/month-review'],
