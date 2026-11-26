@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notesfrais-mike-shell-v88';
+const CACHE_NAME = 'notesfrais-mike-shell-v89';
 
 const SHELL_FILES = [
   '/mike',

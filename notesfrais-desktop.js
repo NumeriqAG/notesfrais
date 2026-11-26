@@ -2,7 +2,7 @@
   const basePatch = window.patchNotesFrais;
   window.patchNotesFrais = function(html){
     html = basePatch ? basePatch(html) : html;
-    if(html.includes('NOTESFRAIS_DESKTOP_V1')) return html;
+    if(html.includes('NOTESFRAIS_DESKTOP_V2')) return html;
 
     // Mike sur ordinateur (nov. 2026).
     //
@@ -34,7 +34,7 @@
 
     // ── 1. Outils globaux, la zone de depot de page et le panneau d'import ──
     rep('App', '\nfunction App(){', String.raw`
-// NOTESFRAIS_DESKTOP_V1 : saisie depuis un ordinateur, plusieurs recus a la fois.
+// NOTESFRAIS_DESKTOP_V2 : saisie depuis un ordinateur, plusieurs recus a la fois.
 function nfDeskOn(){return typeof window!=='undefined'&&window.innerWidth>=860&&!!window.notesFraisRole&&window.notesFraisRole!=='finance';}
 function nfDeskAccept(list){
   return [...(list||[])].filter(Boolean).map(f=>{
@@ -118,7 +118,7 @@ function App(){`);
 
     // ── 2. La file dans la fenetre d'ajout ──────────────────────────────────
     rep('file AddModal', '\n  const confirm=async(nfmAgain)=>{', String.raw`
-  // File de recus deposes ensemble (NOTESFRAIS_DESKTOP_V1).
+  // File de recus deposes ensemble (NOTESFRAIS_DESKTOP_V2).
   const nfDeskRef=React.useRef({q:[],pos:0,total:0,last:''});
   const [,nfDeskBump]=React.useState(0);
   const nfDeskHasFile=React.useRef(false);nfDeskHasFile.current=!!file;
@@ -181,9 +181,14 @@ function App(){`);
     rep('lecture ok', 'OCR done - data extracted automatically', 'Read · check the fields');
     rep('lecture ko', 'OCR unavailable - enter manually', 'Could not read it · enter the fields');
 
+    // Zone principale reperable : sur grand ecran, le contenu y est centre
+    // (il etait colle a gauche avec un grand vide a droite).
+    rep('zone principale', "<div style={{flex:1,overflowY:'auto',padding:isMobile?16:28}}>",
+      "<div data-nf-main=\"true\" style={{flex:1,overflowY:'auto',padding:isMobile?16:28}}>");
+
     // ── 4. Styles : ecran large, compte utilisateur seulement ──────────────
     const css = `<style id="nf-desk-css">
-/* NOTESFRAIS_DESKTOP_V1 */
+/* NOTESFRAIS_DESKTOP_V2 */
 .nf-desk-overlay{position:fixed;inset:0;z-index:5000;background:rgba(15,94,146,.10);backdrop-filter:blur(1px);display:flex;align-items:center;justify-content:center;border:3px dashed #0F5E92;border-radius:14px;margin:8px}
 .nf-desk-overlay-card{pointer-events:none;background:#fff;border-radius:18px;padding:28px 40px;text-align:center;box-shadow:0 24px 60px rgba(30,43,56,.18)}
 .nf-desk-overlay-ico{font-size:34px;color:#0F5E92;line-height:1;margin-bottom:8px}
@@ -202,7 +207,9 @@ function App(){`);
 .nf-desk-preview{position:sticky;top:0;height:min(72vh,760px);background:#F3F6F9;border:0.5px solid #D5DEE6;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .nf-desk-preview iframe{width:100%;height:100%;border:0;background:#fff}
 .nf-desk-preview img{max-width:100%;max-height:100%;object-fit:contain}
-body.nf-desk-user [data-nfm-expenses]{max-width:960px!important}
+body.nf-desk-user [data-nf-main]>*{margin-left:auto!important;margin-right:auto!important}
+body.nf-desk-user [data-nf-main]>*:not([style*="position: fixed"]){max-width:1100px!important}
+body.nf-desk-user [data-nfm-expenses]{max-width:1100px!important}
 body.nf-desk-user [data-user-submit-placement]{display:grid!important;grid-template-columns:minmax(200px,1fr) minmax(260px,1.2fr) auto;column-gap:28px;row-gap:12px;align-items:center!important;padding:18px 22px!important}
 body.nf-desk-user [data-user-submit-placement]>*{grid-column:1/-1;order:0}
 body.nf-desk-user [data-user-submit-placement]>.nfm-sum-head{grid-column:auto;order:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
