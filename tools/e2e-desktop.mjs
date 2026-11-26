@@ -256,6 +256,19 @@ check('panneau « Add receipts from your computer » visible', await page.locato
 const sumDisplay = await page.locator('[data-user-submit-placement]').evaluate(el => getComputedStyle(el).display);
 check('carte du mois mise en forme (grille)', sumDisplay === 'grid', sumDisplay);
 await shot('01-accueil');
+// Sur un grand ecran, le contenu est centre dans la zone principale (il etait colle a gauche).
+await page.setViewportSize({ width: 1900, height: 985 });
+await page.waitForTimeout(1600);
+const gaps = await page.evaluate(() => {
+  const main = document.querySelector('[data-nf-main]'), box = document.querySelector('[data-nfm-expenses]');
+  if (!main || !box) return null;
+  const m = main.getBoundingClientRect(), b = box.getBoundingClientRect();
+  return { left: Math.round(b.left - m.left), right: Math.round(m.right - b.right), width: Math.round(b.width) };
+});
+check('grand ecran : contenu centre', !!gaps && Math.abs(gaps.left - gaps.right) < 30 && gaps.width >= 1000, JSON.stringify(gaps));
+await shot('01b-grand-ecran');
+await page.setViewportSize({ width: 1440, height: 900 });
+await page.waitForTimeout(1600);
 
 // ── 2 · Trois recus choisis d'un coup ─────────────────────────────────
 console.log('\n2. Trois recus choisis d un coup (2 PDF + 1 photo)');
