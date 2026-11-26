@@ -214,7 +214,7 @@ Les deux couches sont complémentaires — ne pas en retirer une.
 | `api/_lib/auth.js` | Cookie signé, comptes, limitation des tentatives. |
 | `api/_lib/db.js` | Client Neon, normalisation des frais. |
 | `api/_lib/r2.js` | Stockage Cloudflare R2. |
-| `api/_lib/receipt-email.js` | Copie des reçus par email. |
+| `api/_lib/receipt-email.js` | Récapitulatif de chaque frais à l'employé, justificatifs joints. |
 | `db/schema.sql` | Schéma Postgres. |
 | `tesseract-worker.min.js` | Worker OCR servi depuis notre origine. Version verrouillée (§5). |
 | `scripts/hash-password.mjs` | Génère une empreinte pour `NOTESFRAIS_USERS`. |
@@ -533,8 +533,19 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
   `RECEIPT_AI_MODEL=claude-haiku-5-5` pour beaucoup moins cher. Repli serveur
   sur refus (`fallbacks: 'default'`) pour les modèles qui l'acceptent. Choix de
   Thomas, nov. 2026 : Tesseract lisait trop mal.
-- **Copie des reçus par email.** À chaque frais créé avec justificatif, un email
-  part vers `RECEIPT_BACKUP_EMAIL` (défaut : l'email de la session).
+- **Récapitulatif de chaque frais par email** (Thomas, 26 nov. 2026 : « c'est
+  une sécurité »). À chaque frais créé par l'employé, **avec ou sans
+  justificatif**, un email en anglais « Your expense has been saved » part vers
+  `RECEIPT_BACKUP_EMAIL` (défaut : l'email de la session) : date, commerçant,
+  montant et devise, montant CHF et sa source, TVA, catégorie, carte, « With »,
+  note, référence, heure d'enregistrement, et **tous les justificatifs joints à un
+  seul email** (au-delà de 18 Mo, les fichiers restants sont cités, pas
+  joints). Un justificatif ajouté plus tard envoie « Receipt added » avec le seul
+  nouveau fichier ; toute autre modification n'envoie rien. Carte et « With »
+  sont relus dans la note (`parseNote`). Préprod : seulement si
+  `RECEIPT_BACKUP_TEST_EMAIL` est définie, objet `[PREPROD - ignorer]`. N'échoue
+  jamais. Rendu sans envoi : `node tools/preview-receipt-email.js` →
+  `.patch-out/email/`.
 - **Offline.** IndexedDB `notesfrais-offline-v1`, fichier sérialisé en data-URL
   base64. Resync sur l'événement `online` et au montage.
 - **CDN externes**, chargés à l'exécution : React 17, ReactDOM 17, Babel
@@ -548,7 +559,7 @@ session, vérification que les ids demandés sont bien accessibles avant d'écri
 `NOTESFRAIS_FINANCE_EMAIL/PASSWORD` · `R2_ACCOUNT_ID` · `R2_ACCESS_KEY_ID` ·
 `R2_SECRET_ACCESS_KEY` · `R2_BUCKET` · `RESEND_API_KEY` ·
 `FINANCE_NOTIFICATION_EMAIL` · `MONTHLY_SUBMISSION_EMAIL` ·
-`MONTHLY_SUBMISSION_TEST_EMAIL` · `RECEIPT_BACKUP_EMAIL` · `RECEIPT_MAIL_FROM` ·
+`MONTHLY_SUBMISSION_TEST_EMAIL` · `RECEIPT_BACKUP_EMAIL` · `RECEIPT_BACKUP_TEST_EMAIL` · `RECEIPT_MAIL_FROM` ·
 `SUBMISSION_MAIL_FROM` · `USER_NOTIFICATION_EMAILS` (`on` pour réactiver les emails à l'utilisateur) · `USER_NOTIFICATION_EMAIL` · `USER_NOTIFICATION_TEST_EMAIL` ·
 `USER_NOTIFICATION_FROM` · `APP_BASE_URL` · `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` ·
 `VAPID_SUBJECT` (paire générée par `node scripts/generate-vapid-keys.mjs`) ·
